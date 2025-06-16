@@ -61,9 +61,9 @@ We've designed a comprehensive sensitivity analysis to understand how different 
 
 To determine whether our sensitivity findings generalize across network designs we apply the LA to two different convolutional architectures:
 
-- **WideLeNet** is a modern yet shallow architecture. As a "widened" variant of the classic LeNet-5, it has strong locality priors from its convolutional filters but increases representational capacity by expanding its channel count. This design typically results in a particular kind of loss-surface geometry, characteristic of less deep networks.
+- **WideLeNet** is a modern yet shallow architecture. As a "widened" variant of the classic LeNet-5 \[2\], it has strong locality priors from its convolutional filters but increases representational capacity by expanding its channel count. This design typically results in a particular kind of loss-surface geometry, characteristic of less deep networks.
 
-- **ResNet18**, in contrast, is a substantially deeper architecture that has become a standard in computer vision. Its use of residual (or "skip") connections fundamentally alters the training dynamics and produces a more complex loss landscape, which is representative of many modern, high-performing models.
+- **ResNet18** \[3\], in contrast, is a substantially deeper architecture that has become a standard in computer vision. Its use of residual (or "skip") connections fundamentally alters the training dynamics and produces a more complex loss landscape, which is representative of many modern, high-performing models.
 
 Using two different architectures allows us to check if our findings hold in general or are merely an artifact of a single model's structure. For our experiment, we trained both models on the MNIST dataset. This is a critical first step, as the post-hoc LA (which we are going to investigate) is designed to be applied to a pretrained model. We first find a Maximum a Posteriori (MAP) estimate through standard training, and then the LA builds a Gaussian approximation to the posterior around that point.
 
@@ -166,7 +166,7 @@ In conclusion, while the `SubspaceLaplace` variant is a successful implementatio
 
 In our exploration, we can first zoom in on the most crucial hyperparameter: `prior_precision`. This single value, which controls the strength of our Bayesian regularization, has a profound impact on model calibration and robustness.
 
-> Note: when the plots are titled Aggregated Result, results where averaged between the two different models (WideLeNet and ResNet18), as their behaviour was almost identical, thus not interesting to show both.
+> In this report, any plot explicitly titled 'Aggregated Result' displays data averaged across both the WideLeNet and ResNet18 models. This was done in specific cases where the two architectures exhibited nearly identical behavior, allowing for a clearer, combined presentation.
 
 1. **Regularization improves ID calibration**
 
@@ -297,3 +297,5 @@ Interestingly, the `diag` Hessian appears to be slightly more sensitive to tempe
 ## References
 
 \[1\] E. Daxberger, A. Kristiadi, A. Immer, R. Eschenhagen, M. Bauer, and P. Hennig, "Laplace Redux – Effortless Bayesian Deep Learning," in *Advances in Neural Information Processing Systems*, 2021.
+\[2\] LeCun, Yann, et al. "Gradient-based learning applied to document recognition." Proceedings of the IEEE 86.11 (2002): 2278-2324.
+\[3\] He, Kaiming, et al. "Deep residual learning for image recognition." Proceedings of the IEEE conference on computer vision and pattern recognition. 2016.
