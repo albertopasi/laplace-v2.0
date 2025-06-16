@@ -237,7 +237,7 @@ Hence, LA is not a one-size-fits-all tool, its effect is context-dependent and h
 
 #### 3.4.2 Hessian Structure and Link Approximation analysis
 
-The "Laplace Redux" paper states that the Kronecker-factored (`kron`) Hessian approximation offers a good trade-off between expressiveness and efficiency compared to a simple diagonal (`diag`) one. Our analysis reveals this is not a universal truth, but rather a complex reality where the optimal Hessian structure depends on a three-way interplay between regularization (`prior_precision`), the chosen link approximation (`link_approx`), and the severity of the distribution shift.
+The "Laplace Redux" paper recommends the Kronecker-factored (`kron`) Hessian approximation as a default, stating it "provides a good trade-off between expressiveness and speed" while noting that diagonal (`diag`) approximations "perform significantly worse". Our analysis confirms that this is often true, but reveals a more complex reality where the optimal choice depends on a three-way interplay between regularization (`prior_precision`), the chosen link approximation (`link_approx`), and the severity of the distribution shift.
 
 #### The unifying effect of strong regularization
 
