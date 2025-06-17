@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings('ignore')
 import torch.nn as nn
 
-from laplace.swag_laplace import SWAGLaplace
+from laplace.swag_laplace_new import SWAGLaplace
 
 
 def main(args):
@@ -124,46 +124,68 @@ def fit_models(args, train_loader, val_loader, device):
 
         elif args.method == 'swag_laplace':
             print("Fitting SWAG-Laplace...")
-            
-            # Initialize the SWAGLaplace instance with the loaded neural network model
-            # The 'model' variable will now refer to the SWAGLaplace instance.
+
+            # --- Recommended Hardcoded Training Schedule ---
+            # Total number of epochs for the entire training run.
+            total_epochs = 2
+            # Epoch at which to start the SWA procedure.
+            swa_start_epoch = 0
+            # Initial learning rate for the pre-SWA phase.
+            initial_lr = 0.1
+            # Constant learning rate for the SWA phase.
+            swa_learning_rate = 0.01
+            # Rank of the low-rank covariance matrix (number of models to store).
+            swag_rank = 20
+            # Frequency (in epochs) to collect models during SWA.
+            swa_collection_freq = 1
+            # ------------------------------------------------
+
+            # Ensure the configuration is valid
+            if swa_start_epoch >= total_epochs:
+                raise ValueError("SWAG start epoch must be less than total epochs.")
+
+            # Initialize the SWAGLaplace instance
             model_instance = SWAGLaplace(
-                model,  # Pass the actual nn.Module
+                model,
                 likelihood=args.likelihood,
-                prior_precision=args.prior_precision, # Handled by BaseLaplace via **kwargs
-                temperature=args.temperature,       # Handled by BaseLaplace via **kwargs
-                n_models=args.swag_n_snapshots,
-                max_num_models=args.swag_n_snapshots, # Ensure max_num_models accommodates n_models
-                swa_lr=args.swag_lr, # Passed to SWAGLaplace __init__ for SWAG utility
-                # You might want to add args for swa_freq, start_epoch, var_clamp if needed
-                # e.g., swa_freq=getattr(args, 'swag_freq', 1),
+                swa_start=swa_start_epoch,
+                swa_lr=swa_learning_rate,
+                rank=swag_rank,
+                swa_freq=swa_collection_freq,
+                prior_precision=args.prior_precision,
+                temperature=args.temperature,
                 device=device
             )
 
-            # Create optimizer for the SWAG training phase
-            # It should optimize the parameters of the underlying nn.Module
+            # Use a standard optimizer. The SWAGLaplace class will handle the LR switch.
             optimizer = torch.optim.SGD(
-                model.parameters(), # Use parameters of the original nn_model
-                lr=1e-4, # Learning rate for SWAG-Laplace
-                momentum=0.9 # A common momentum value for SWAG's SGD
+                model.parameters(),
+                lr=initial_lr,
+                momentum=0.9,
+                weight_decay=0.0  # The prior is handled by Laplace, so set decay here to 0
             )
             
-            # Create criterion
+            # Create the loss criterion based on the likelihood
             if args.likelihood == 'classification':
                 criterion = nn.CrossEntropyLoss()
             elif args.likelihood == 'regression':
-                criterion = nn.MSELoss() # Adjust if a different loss is standard for regression in your setup
+                criterion = nn.MSELoss()
             else:
-                raise ValueError(f"Unsupported likelihood for SWAG-Laplace criterion: {args.likelihood}")
+                raise ValueError(f"Unsupported likelihood: {args.likelihood}")
             
+            print(f"Training for {total_epochs} epochs, starting SWA at epoch {swa_start_epoch}.")
+            
+            # Fit the model using the total number of epochs
             model_instance.fit(
                 train_loader,
                 optimizer=optimizer,
                 criterion=criterion,
-                epochs=10,
-                progress_bar=getattr(args, 'progress_bar', True) # Example for progress bar
+                epochs=total_epochs,
+                progress_bar=True
             )
-            model = model_instance # Ensure the 'model' variable for mixture_components is the SWAGLaplace instance
+
+            # The final fitted model is the SWAGLaplace instance
+            model = model_instance
 
         if args.likelihood == 'regression' and args.sigma_noise is None:
             print("Optimizing noise standard deviation on validation data...")
