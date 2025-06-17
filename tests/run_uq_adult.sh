@@ -53,7 +53,7 @@ for seed in "${SEEDS[@]}"; do
     python3 tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} --method laplace --subset_of_weights last_layer --domain_shift_gender male_to_female --run_name "${BENCHMARK}/shift_male_to_female_seed${seed}"
 
     echo "--> RUNNING DOMAIN SHIFT: Female-to-Male"
-    python tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} --method laplace --subset_of_weights last_layer --domain_shift_gender female_to_male --run_name "${BENCHMARK}/shift_female_to_male_seed${seed}"
+    python3 tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} --method laplace --subset_of_weights last_layer --domain_shift_gender female_to_male --run_name "${BENCHMARK}/shift_female_to_male_seed${seed}"
 
 
     # === 3. NOISE INTENSITY EXPERIMENTS (Using standard Last-Layer LA) ===
