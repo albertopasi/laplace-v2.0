@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Starting Final Adult Dataset Experiment Suite"
-echo "This will run all methods over multiple seeds."
+echo "This will run all experiments over multiple seeds."
 echo "-------------------------------------------------"
 
 # === Configuration ===
@@ -16,7 +16,7 @@ mkdir -p $RESULTS_ROOT
 
 COMMON_ARGS="--benchmark ${BENCHMARK} --model ${MODEL_NAME} --data_root ${DATA_ROOT} --batch_size 256"
 
-# Specific arguments for the new methods from your friends' scripts
+# Specific arguments for the new methods
 SUBSPACE_ARGS="--method subspace --subspace_dim 20 --subspace_method random --eig_steps 100"
 SWAG_LAPLACE_ARGS="--method swag_laplace --n_samples 30 --subspace_dim 20 --subspace_method random --eig_steps 100"
 
@@ -28,8 +28,8 @@ for seed in "${SEEDS[@]}"; do
     echo "       RUNNING FOR SEED: $seed"
     echo "========================================"
 
-    # Use a seed for the model training/initialization
-    SEED_ARGS="--model_seed ${seed}"
+    # THE FIX IS HERE: Use --seed instead of --model_seed
+    SEED_ARGS="--seed ${seed}"
 
     # === 1. BASELINE EXPERIMENTS (Standard Train/Test Split) ===
     echo "--> RUNNING BASELINE: MAP"
