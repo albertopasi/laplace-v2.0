@@ -51,6 +51,20 @@ The Subspace Laplace algorithm works as follows:
 
 ### 2.2 New Algorithm Variant: SwagLaplace
 
+This work also introduces SWAG-Laplace, a novel variant that combines the Laplace approximation with Stochastic Weight Averaging-Gaussian (SWAG). While traditional Laplace methods compute a Hessian approximation around a single Maximum a Posteriori (MAP) estimate, SWAG-Laplace leverages the statistics gathered from the SWAG training process to define a more robust and empirically-grounded Gaussian posterior.
+
+The motivation for this variant is to improve the quality and efficiency of the Laplace approximation. The SWAG method, by its nature, explores a wider area of the loss landscape by averaging multiple weight configurations found during training. This provides a natural and powerful estimate of the posterior's. Instead of calculating the Hessian via backpropagation, which can be computationally intensive and sensitive to noise, SWAG-Laplace directly uses the diagonal variance from the SWAG posterior as an estimate of the local curvature. This makes the process more efficient and harnesses the rich information captured by the SWAG training history.
+
+The SWAG-Laplace algorithm works as follows:
+
+1. **Train with SWAG:** First, the model is trained using the SWAG procedure. This involves training for a certain number of epochs and then collecting multiple model weight snapshots at a regular frequency. These snapshots are used to compute a running average of the first moment (the mean) and the second moment (the mean of the squares) of the model's parameters.
+
+2. **Set Posterior Center:** The center of the Laplace approximation, $θ_{LAP}$, is set to the mean of the models collected during the SWAG process ($θ_{SWA}$). This provides a more robust estimate than a single MAP solution, as it represents the center of a dense region of high-performing models.
+
+3. **Estimate Hessian from SWAG Variance:** The diagonal of the Hessian, $H$, is estimated directly from the variance of the SWAG posterior. The diagonal variance is calculated from the stored first and second moments: $ \sigma^2_{SWAG, ii} = \text{mean\_sq}_i - \text{mean}_i^2 $. The Hessian's diagonal is then taken as the inverse of this variance: $H_{ii} = 1 / \sigma^2_{SWAG, ii}$. This step cleverly substitutes a direct Hessian calculation with a more stable, empirically derived estimate of the curvature.
+
+4. **Inference:** The final posterior is a diagonal Gaussian approximation centered at $θ_{SWA}$ with a diagonal precision matrix $P$ formed by the SWAG-derived Hessian plus the prior precision: $P=diag(H)+λI$. This allows for highly efficient inference and uncertainty quantification, leveraging a covariance matrix that reflects the diversity of models encountered during SWAG training.
+
 ### 2.3 Evaluating on New Datasets
 
 ### 2.4 Hyperparameter Sensitivity Analysis
@@ -120,7 +134,6 @@ To properly contextualize the performance of the Laplace Approximation, the auth
 
 We began by replicating their baseline results. Our findings confirm the paper's claims, as we were able to reproduce the reported metrics with only marginal differences, typically within a $1-2%$ margin. These minor variations are expected due to differences in hardware and software environments. We decided to include *run time* as a metric in the tables, in order additionally to compare the performance of the new algorithm variants w.r.t. the *vanilla* laplace method.
 
-
 ### 3.1: Subspace Laplace Results
 
 Investigating the `SubspaceLaplace` variant yielded an insightful set of results: the core motivation was to test whether isolating the Laplace approximation to a low-dimensional subspace, defined by the directions of highest curvature (Hessian eigenvectors), could offer a more effective or efficient way to capture model uncertainty compared to full-rank or last-layer methods.
@@ -157,6 +170,40 @@ The discrepancy between the method's theoretical appeal and its empirical perfor
 In conclusion, while the `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and the marginal gains in uncertainty quantification.
 
 ### 3.2: SwagLaplace Results
+
+Investigating the `SwagLaplace` variant yielded a surprising and highly informative set of results. The motivation was to test if using the empirical posterior distribution from Stochastic Weight Averaging-Gaussian (SWAG) could provide a more robust and effective prior for a subsequent Laplace approximation.
+
+The results on the MNIST OOD task are summarized in the table below, which includes our swag_laplace variant alongside the reproduced baselines:
+
+| Method             | Confidence ↓ | AUROC ↑  | Fit Time (s) ↓ |
+| :----------------- | :----------- | :------- | :------------- |
+| MAP                | 75.0±0.6     | 96.5±0.2 | 0.64±0.01      |
+| DE                 | 65.7±0.5     | 97.5±0.0 | 0.68±0.05      |
+| VB                 | 73.3±1.4     | 95.9±0.3 | 1.76±0.01      |
+| HMC                | 69.2±3.2     | 96.1±0.3 | 0.66±0.01      |
+| SWAG               | 76.8±0.0     | 96.3±0.0 | 1.25±0.0       |
+| ---                | ---          | ---      | ---            |
+| `laplace_all`      | 67.5±0.4     | 96.0±0.2 | 2.00±0.3       |
+| `laplace_last_layer` | 43.1±0.9     | 95.7±0.4 | 0.68±0.04      |
+| `swag_laplace`         | 77.7±0.5     | 96.5±0.2 | 44.01±0.38     |
+
+From these results, we can draw several conclusions:
+
+1. **Failure to Reduce Overconfidence:** The most critical finding is that the `swag_laplace` variant not only fails to reduce overconfidence on OOD data but actually increases it. Its confidence score of 77.7 is the highest (worst) of all tested methods, surpassing even the MAP (75.0) and standard SWAG (76.8) baselines. This indicates a fundamental failure of the method for this task, as it becomes more certain of its incorrect predictions when presented with novel data.
+
+2. **Extreme Computational Cost:** Similar to the subspace variant, the `swag_laplace` method is prohibitively slow. With a fit time of over 44 seconds, it is the slowest of all methods. This cost is dominated by the initial SWAG training phase, which requires many epochs of training to collect the necessary model weight statistics before the Laplace approximation can be computed. This makes it impractical for many real-world scenarios.
+
+3. **Disconnect Between AUROC and Confidence:** Despite its poor calibration, the `swag_laplace` variant achieves an excellent AUROC score of 96.5, matching the MAP baseline. This is an interesting result, as it suggests that while the model's absolute confidence scores are miscalibrated, its ability to rank predictions and discriminate between in- and out-of-distribution data remains strong.
+
+**Why is it not more effective?**
+
+The method's poor performance, particularly its tendency toward overconfidence, suggests a flawed central assumption. The SwagLaplace implementation assumes that the inverse of the SWAG diagonal variance is a good proxy for the diagonal of the Hessian. These results suggest this is not the case.
+
+1. **Invalid Hessian Approximation:** SWAG variance measures the spread of high-performing models in a relatively flat region of the loss landscape. The core idea of `SwagLaplace` is that a larger spread (high variance) corresponds to lower curvature (low precision), and vice-versa. The empirical results show that simply inverting this variance does not produce a Hessian approximation that captures meaningful uncertainty for OOD detection. The resulting posterior is evidently too sharp, leading to severe overconfidence.
+
+2. **SWAG and Laplace Capture Different Information:** The uncertainty captured by SWAG comes from exploring a wide range of good solutions, which reflects the model's overall robustness. The Laplace approximation, however, estimates curvature at a single point. The information from SWAG's wider exploration does not translate well to Laplace's single-point estimate. The benefits of averaging diverse models get lost.
+
+In conclusion, the `SwagLaplace` variant, while an interesting conceptual hybrid, proves to be ineffective and impractical for this task. It demonstrates the worst of both worlds: the extreme computational cost of SWAG combined with an uncertainty estimate that is even more overconfident than simple baselines. It stands as a valuable negative result, demonstrating that a naive combination of uncertainty quantification methods can lead to a degradation in performance.
 
 ### 3.3: Results on New Datasets
 
