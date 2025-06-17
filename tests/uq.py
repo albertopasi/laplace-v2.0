@@ -209,8 +209,8 @@ def compute_metrics(i, id, all_y_prob, test_loader, all_y_prob_in, all_y_var, ar
 
     metrics = {}
 
-    # compute Brier, ECE and MCE for distribution shift and WILDS benchmarks
-    if args.benchmark in ['R-MNIST', 'R-FMNIST', 'CIFAR-10-C', 'ImageNet-C'] and (args.benchmark != 'WILDS-poverty'):
+    # THE FIX IS HERE: Add 'Adult' to this list
+    if args.benchmark in ['R-MNIST', 'R-FMNIST', 'CIFAR-10-C', 'ImageNet-C', 'Adult'] and (args.benchmark != 'WILDS-poverty'):
         print(f'{args.benchmark} with distribution shift intensity {i}')
         labels = torch.cat([data[1] for data in test_loader])
         metrics['brier'] = util.get_brier_score(all_y_prob, labels)
@@ -232,6 +232,7 @@ def compute_metrics(i, id, all_y_prob, test_loader, all_y_prob_in, all_y_var, ar
             all_y_prob.numpy(), all_y_var.sqrt().numpy(), labels.numpy())
 
     return metrics
+
 
 
 if __name__ == "__main__":

@@ -1,73 +1,188 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import defaultdict
+
+# --- Configuration ---
+RESULTS_DIR = './results/Adult/'
+SEEDS = [6, 12, 13, 523, 972394]
+
+# Define the experiments and their human-readable names
+# This dictionary maps a display name to a file prefix
+EXPERIMENTS = {
+    'Baselines': [
+        ('MAP', 'map_baseline'),
+        ('LA', 'laplace_ll_baseline'),
+        ('LA*', 'laplace_star_baseline'),
+        ('Subspace LA', 'subspace_baseline'),
+        ('SWAG-Laplace', 'swag_laplace_baseline'),
+    ],
+    'Domain Shift': [
+        ('Shift: Male-to-Female', 'shift_male_to_female'),
+        ('Shift: Female-to-Male', 'shift_female_to_male'),
+    ],
+    'Noise Intensity': [
+        ('Noise: 0.1', 'noise_0.1'),
+        ('Noise: 0.25', 'noise_0.25'),
+        ('Noise: 0.5', 'noise_0.5'),
+        ('Noise: 0.75', 'noise_0.75'),
+        ('Noise: 1.0', 'noise_1.0'),
+    ]
+}
 
 
-def generate_table():
+def calculate_ece(metrics):
+    """A placeholder for ECE calculation if it's not in the file."""
+    # In the actual codebase, this would be properly calculated.
+    # For now, we'll return a placeholder if not found.
+    return metrics.get('ece', np.nan)
+
+
+def load_and_aggregate_results():
     """
-    Loads all .npy results from the results/Adult directory,
-    processes them, and prints a Markdown table.
+    Loads all .npy result files, groups them by experiment,
+    and computes the mean and standard deviation of metrics across seeds.
     """
-    results_dir = './results/Adult/'
+    aggregated_results = dict()
 
-    # Define the order and display names for the table rows
-    scenarios = {
-        'MAP Baseline': 'map_baseline.npy',
-        'Laplace LL Baseline': 'laplace_ll_baseline.npy',
-        'Shift: Male-to-Female': 'shift_male_to_female.npy',
-        'Shift: Female-to-Male': 'shift_female_to_male.npy',
-        'Noise Intensity: 0.1': 'noise_0.1.npy',
-        'Noise Intensity: 0.25': 'noise_0.25.npy',
-        'Noise Intensity: 0.5': 'noise_0.5.npy',
-        'Noise Intensity: 0.75': 'noise_0.75.npy',
-        'Noise Intensity: 1.0': 'noise_1.0.npy'
-    }
+    for category, experiments in EXPERIMENTS.items():
+        for display_name, file_prefix in experiments:
+            experiment_metrics = defaultdict(list)
 
-    processed_results = []
+            for seed in SEEDS:
+                filename = f"{file_prefix}_seed{seed}.npy"
+                file_path = os.path.join(RESULTS_DIR, filename)
 
-    print("Loading and processing results...")
-    for name, filename in scenarios.items():
-        file_path = os.path.join(results_dir, filename)
+                if os.path.exists(file_path):
+                    try:
+                        raw_data = np.load(file_path, allow_pickle=True)
+                        metrics = raw_data[0]
+                        experiment_metrics['Accuracy'].append(metrics.get('acc', np.nan))
+                        experiment_metrics['NLL'].append(metrics.get('nll', np.nan))
+                        experiment_metrics['ECE'].append(calculate_ece(metrics))  # Add ECE
+                    except Exception as e:
+                        print(f"Warning: Could not load or process {filename}. Error: {e}")
+                else:
+                    print(f"Warning: Missing file for seed {seed}: {filename}")
 
-        if not os.path.exists(file_path):
-            print(f"Warning: Could not find result file {filename}")
-            continue
+            # Compute mean and std dev if we have any results
+            if experiment_metrics:
+                summary = dict()
+                for metric, values in experiment_metrics.items():
+                    valid_values = [v for v in values if not np.isnan(v)]
+                    if valid_values:
+                        summary[f'{metric}_mean'] = np.mean(valid_values)
+                        summary[f'{metric}_std'] = np.std(valid_values)
+                    else:
+                        summary[f'{metric}_mean'] = np.nan
+                        summary[f'{metric}_std'] = np.nan
+                aggregated_results[(category, display_name)] = summary
 
-        # Load the numpy file
-        raw_data = np.load(file_path, allow_pickle=True)
+    return aggregated_results
 
-        # The data is saved as an array of one dictionary, e.g. [{'acc': 0.85, ...}]
-        # So we extract the first element.
-        metrics = raw_data[0]
 
-        # Extract the metrics you care about for the table
-        result_row = {
-            'Experiment': name,
-            'Accuracy': metrics.get('acc', float('nan')),
-            'NLL': metrics.get('nll', float('nan')),
-            'Confidence': metrics.get('conf', float('nan')),
-            'Test Time (s)': metrics.get('test_time', float('nan'))
-        }
-        processed_results.append(result_row)
-
-    if not processed_results:
-        print("No result files found. Cannot generate table.")
+def format_table(results_df, title):
+    """Formats and prints a DataFrame as a Markdown table."""
+    print(f"\n--- {title} ---")
+    if results_df.empty:
+        print("No results to display.")
         return
 
-    # Create a pandas DataFrame for easy formatting
-    df = pd.DataFrame(processed_results)
+    # Format to 'mean ± std'
+    for metric in ['Accuracy', 'NLL', 'ECE']:
+        mean_col = f'{metric}_mean'
+        std_col = f'{metric}_std'
+        if mean_col in results_df.columns and std_col in results_df.columns:
+            results_df[metric] = results_df.apply(
+                lambda row: f"{row[mean_col]:.4f} ± {row[std_col]:.4f}"
+                if pd.notna(row[mean_col]) else "N/A",
+                axis=1
+            )
 
-    # Format the numbers to 4 decimal places for clarity
-    for col in ['Accuracy', 'NLL', 'Confidence', 'Test Time (s)']:
-        df[col] = df[col].apply(lambda x: f"{x:.4f}" if not pd.isna(x) else "N/A")
+    # Select and rename columns for display
+    display_cols = ['Experiment', 'Accuracy', 'NLL', 'ECE']
+    results_df = results_df[display_cols]
 
-    # Convert the DataFrame to a Markdown table and print
-    markdown_table = df.to_markdown(index=False)
+    print(results_df.to_markdown(index=False))
 
-    print("\n--- Results Table ---")
-    print(markdown_table)
-    print("\n")
+
+def create_plots(results_df):
+    """Creates and saves plots similar to Figure 4."""
+    print("\n--- Creating Plots ---")
+    sns.set_theme(style="whitegrid")
+
+    # Filter for necessary data
+    noise_df = results_df[results_df['Category'] == 'Noise Intensity'].copy()
+    shift_df = results_df[results_df['Category'] == 'Domain Shift']
+    baseline_df = results_df[results_df['Category'] == 'Baselines']
+
+    # Add baseline results to the shift_df for plotting comparison
+    plot_shift_df = pd.concat([
+        baseline_df[baseline_df['Experiment'] == 'LA'],
+        shift_df
+    ]).rename(columns={'Experiment': 'Condition'})
+
+    # Plot 1: Noise Intensity vs. NLL and Accuracy
+    if not noise_df.empty:
+        noise_df['Intensity'] = noise_df['Experiment'].str.extract(r'(\d+\.\d+)').astype(float)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+        sns.lineplot(data=noise_df, x='Intensity', y='NLL_mean', marker='o', ax=ax1)
+        ax1.set_title('Shift Intensity vs. NLL')
+        ax1.set_ylabel('Negative Log-Likelihood (NLL)')
+        ax1.set_xlabel('Gaussian Noise Intensity')
+
+        sns.lineplot(data=noise_df, x='Intensity', y='Accuracy_mean', marker='o', ax=ax2)
+        ax2.set_title('Shift Intensity vs. Accuracy')
+        ax2.set_ylabel('Accuracy')
+        ax2.set_xlabel('Gaussian Noise Intensity')
+
+        fig.suptitle('Performance under Noise-based Distribution Shift', fontsize=16)
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.savefig('adult_noise_intensity_plot.png')
+        print("Saved noise intensity plot to adult_noise_intensity_plot.png")
+
+    # Plot 2: Domain Shift Comparison
+    if not plot_shift_df.empty:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5), sharey=False)
+
+        sns.barplot(data=plot_shift_df, x='Condition', y='Accuracy_mean', ax=ax1)
+        ax1.set_title('Accuracy under Gender-based Domain Shift')
+        ax1.set_ylabel('Accuracy')
+        ax1.set_xlabel('')
+        ax1.tick_params(axis='x', rotation=15)
+
+        sns.barplot(data=plot_shift_df, x='Condition', y='NLL_mean', ax=ax2, palette='viridis')
+        ax2.set_title('NLL under Gender-based Domain Shift')
+        ax2.set_ylabel('Negative Log-Likelihood (NLL)')
+        ax2.set_xlabel('')
+        ax2.tick_params(axis='x', rotation=15)
+
+        fig.suptitle('Performance under Gender-based Domain Shift', fontsize=16)
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.savefig('adult_domain_shift_plot.png')
+        print("Saved domain shift plot to adult_domain_shift_plot.png")
 
 
 if __name__ == '__main__':
-    generate_table()
+    all_results = load_and_aggregate_results()
+
+    # Convert to DataFrame for easier manipulation
+    results_list = []
+    for (category, name), metrics in all_results.items():
+        row = {'Category': category, 'Experiment': name, **metrics}
+        results_list.append(row)
+
+    df = pd.DataFrame(results_list)
+
+    # Generate and print tables
+    format_table(df[df['Category'] == 'Baselines'].copy(), "Baseline Method Comparison")
+    format_table(df[df['Category'] == 'Domain Shift'].copy(), "Domain Shift Results")
+    format_table(df[df['Category'] == 'Noise Intensity'].copy(), "Noise Intensity Results")
+
+    # Generate and save plots
+    create_plots(df)
+
