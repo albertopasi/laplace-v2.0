@@ -128,7 +128,7 @@ def fit_models(args, train_loader, val_loader, device, num_features=None):
 
             # --- Recommended Hardcoded Training Schedule ---
             # Total number of epochs for the entire training run.
-            total_epochs = 2
+            total_epochs = 100
             # Epoch at which to start the SWA procedure.
             swa_start_epoch = 0
             # Initial learning rate for the pre-SWA phase.
