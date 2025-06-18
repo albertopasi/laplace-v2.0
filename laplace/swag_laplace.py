@@ -1,196 +1,274 @@
 from __future__ import annotations
-
 import torch
 import torch.nn as nn
-from torch.cuda.amp import autocast, GradScaler
 from torch.utils.data import DataLoader
-from torch.nn.utils import parameters_to_vector
+from torch.nn.utils import parameters_to_vector, vector_to_parameters
+from collections import deque
+import warnings
+from tqdm import tqdm
 
+# Assumes baselaplace.py is in the same directory or python path
 from laplace.baselaplace import DiagLaplace
-from laplace.utils.swag import SWAG
-import gc
 
 
 class SWAGLaplace(DiagLaplace):
+    """
+    SWAG-as-a-Posterior, a method for uncertainty estimation in deep learning.
+
+    This method uses Stochastic Weight Averaging (SWA) to find a good posterior
+    mean and to estimate the covariance of the posterior distribution. The posterior
+    is approximated as a Gaussian with a low-rank plus diagonal covariance structure.
+
+    The covariance is estimated as:
+    Covariance = Diag(sigma_diag^2) + (1/K) * D @ D.T
+    where:
+    - sigma_diag^2 is the diagonal variance estimated from the moments of SWA iterates.
+    - D is the deviation matrix, where columns are (theta_i - theta_mean).
+    - K is the number of models collected (the rank of the low-rank part).
+
+    This class inherits from `DiagLaplace` to reuse its infrastructure for the
+    diagonal part of the posterior and overrides methods to include the low-rank component.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The neural network to be trained.
+    likelihood : str, {'classification', 'regression'}
+        The likelihood of the model.
+    swa_start : int, default=10
+        The training epoch to start the SWA procedure.
+    swa_lr : float, default=0.01
+        The constant learning rate to use during SWA.
+    swa_freq : int, default=1
+        The frequency in epochs to collect model weights for SWA.
+    rank : int, default=20
+        The maximum number of model weights to store for the low-rank approximation.
+        This is the rank 'K' of the low-rank covariance component.
+    sigma_noise : float, default=1.0
+        Observation noise for regression.
+    prior_precision : float, default=1.0
+        Prior precision (weight decay).
+    temperature : float, default=1.0
+        Temperature for the likelihood.
+    device : torch.device, optional
+        The device to run the computations on.
+    """
+
+    # Unique key for this Laplace type
     _key = ("all", "swag_laplace")
 
     def __init__(
             self,
             model: nn.Module,
             likelihood: str,
-            n_models: int = 20,
-            start_epoch: int = 0,
+            swa_start: int = 10,
+            swa_lr: float = 0.01,
             swa_freq: int = 1,
-            swa_lr: float = 0.05,
-            max_num_models: int = 20,
-            var_clamp: float = 1e-30,
-            prior_precision=1.0,  # Example, ensure these match DiagLaplace needs
-            temperature=1.0,  # Example
+            rank: int = 20,
+            sigma_noise: float = 1.0,
+            prior_precision: float = 1.0,
+            prior_mean: float = 0.0,
+            temperature: float = 1.0,
             device=None,
-            **kwargs
+            **kwargs,
     ):
-        super().__init__(model, likelihood, prior_precision=prior_precision,
-                         temperature=temperature, **kwargs)
-
-        self.device = device if device is not None else next(model.parameters()).device
-
-        # Initialize SWAG
-        self.swag = SWAG(
-            model=model,
-            n_models=n_models,
-            start_epoch=start_epoch,
-            swa_freq=swa_freq,
-            swa_lr=swa_lr,
-            max_num_models=max_num_models,
-            var_clamp=var_clamp,
-            device=self.device
+        super().__init__(
+            model,
+            likelihood,
+            sigma_noise=sigma_noise,
+            prior_precision=prior_precision,
+            prior_mean=prior_mean,
+            temperature=temperature,
+            **kwargs,
         )
 
-        # Initialize storage for SWAG statistics
-        self._init_swag_storage()
+        if device is not None:
+            self.device = device
+        else:
+            self.device = next(model.parameters()).device
+        self.model.to(self.device)
 
-    def _init_swag_storage(self):
-        self.swag_mean = None
-        self.swag_covariance = None
+        # SWA hyperparameters
+        self.swa_start = swa_start
+        self.swa_lr = swa_lr
+        self.swa_freq = swa_freq
 
-    def _init_H(self):
-        n_params = sum(p.numel() for p in self.model.parameters())
-        self.H = torch.zeros(
-            n_params, device=self._device, dtype=self._dtype
-        )
+        # Rank of the low-rank covariance approximation
+        self.rank = rank
+
+        # Storage for SWA statistics
+        self._collected_weights = deque(maxlen=self.rank)
+        self.n_models_collected = 0
+        self.swag_mean_vec = None
+        self.swag_sq_mean_vec = None
+
+        # Low-rank deviation matrix D
+        self.D = None
 
     def fit(self,
-            train_loader: DataLoader,
-            override: bool = True,  # Move to match parent class ordering
-            progress_bar: bool = False,  # Move to match parent class ordering
-            optimizer: torch.optim.Optimizer | None = None,
-            criterion: nn.Module | None = None,
-            epochs: int | None = None,
-            start_epoch: int = 0,
-            **kwargs  # To catch any other arguments
-            ):
-        # Extract parameters from kwargs if they were passed that way,
-        # otherwise use the explicitly passed ones.
-        opt = optimizer if optimizer is not None else kwargs.pop('optimizer', None)
-        crit = criterion if criterion is not None else kwargs.pop('criterion', None)
-        eps = epochs if epochs is not None else kwargs.pop('epochs', None)
-
-        if opt is not None and crit is not None and eps is not None:
-            self.train_swag(
-                train_loader=train_loader,
-                optimizer=opt,
-                criterion=crit,
-                epochs=eps,
-                start_epoch=start_epoch,
-                progress_bar=progress_bar,
-                **kwargs  # Pass remaining kwargs
-            )
-        else:
-            raise ValueError(
-                "SWAGLaplace.fit requires 'optimizer', 'criterion', and 'epochs' "
-                "to be provided for SWAG training."
-            )
-
-    def train_swag(
-            self,
             train_loader: DataLoader,
             optimizer: torch.optim.Optimizer,
             criterion: nn.Module,
             epochs: int,
-            start_epoch: int = 0,
             progress_bar: bool = False,
-            **kwargs
-    ):
+            ):
+        """
+        Train the model using the SWAG procedure and compute the posterior approximation.
 
-        # First, train the model using SWAG
-        self.swag.fit(
-            train_loader=train_loader,
-            optimizer=optimizer,
-            criterion=criterion,
-            epochs=epochs,
-            start_epoch=start_epoch,
-            progress_bar=progress_bar
-        )
+        Parameters
+        ----------
+        train_loader : DataLoader
+            DataLoader for the training data.
+        optimizer : torch.optim.Optimizer
+            The optimizer to use for training.
+        criterion : nn.Module
+            The loss function.
+        epochs : int
+            The total number of epochs to train for.
+        progress_bar : bool, default=False
+            Whether to display a progress bar during training.
+        """
+        if self.swa_start >= epochs:
+            warnings.warn("SWA start epoch is after the total number of epochs. SWA will not run.")
 
-        # Get SWAG statistics
-        var, (U, S) = self.swag.get_covariance()
+        self.n_data = len(train_loader.dataset)
+        self.model.train()
 
-        # Store SWAG mean (on CPU to save GPU memory)
-        self.swag_mean = [mean.clone().cpu() for mean in self.swag.mean]
+        iterator = range(epochs)
+        if progress_bar:
+            iterator = tqdm(iterator, desc="SWAG Training")
 
-        # Store SWAG covariance (on CPU to save GPU memory)
-        self.swag_covariance = {
-            'var': [v.cpu() for v in var],
-            'U': [u.cpu() if u is not None else None for u in U],
-            'S': [s.cpu() if s is not None else None for s in S]
-        }
+        for epoch in iterator:
+            # SWA learning rate schedule
+            is_swa_epoch = epoch >= self.swa_start
+            if is_swa_epoch:
+                # Set to constant SWA learning rate
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = self.swa_lr
 
-        # Clear SWAG's internal storage to free memory
-        if hasattr(self.swag, '_mean_list'):
-            del self.swag._mean_list
+            total_loss = 0
+            for X_batch, y_batch in train_loader:
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
 
-        # Force garbage collection
-        # gc.collect()
-        # torch.cuda.empty_cache()
+                optimizer.zero_grad()
+                output = self.model(X_batch)
+                loss = criterion(output, y_batch)
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
 
-        # Compute Laplace approximation using SWAG statistics
-        self._compute_laplace_approximation()
+            avg_loss = total_loss / len(train_loader)
+            if progress_bar:
+                iterator.set_postfix(loss=f"{avg_loss:.4f}", swa=is_swa_epoch)
 
-    def _compute_laplace_approximation(self):
-        # Process on CPU to save VRAM, then transfer only the final results
-        with torch.no_grad():
-            # Set the model parameters to SWAG mean
-            for model_param, mean_val in zip(self.model.parameters(), self.swag_mean):
-                model_param.data.copy_(mean_val.to(self.device))
-            
-            # Update self.mean
-            self.mean = parameters_to_vector(self.model.parameters()).detach()
+            # Collect weights during SWA phase
+            if is_swa_epoch and (epoch - self.swa_start) % self.swa_freq == 0:
+                self._update_swag_stats()
 
-            # Process covariance on CPU
-            var_list = self.swag_covariance['var']
-            var_flattened = torch.cat([v.reshape(-1) for v in var_list])
-            
-            # Ensure no zeros
-            eps = 1e-6
-            var_flattened = torch.clamp(var_flattened, min=eps)
-            
-            # Convert variance to precision on CPU
-            h_cpu = 1.0 / var_flattened
-            
-            # Only move to device at the end
-            self.H = h_cpu.to(self._device, self._dtype)
-            
-            # Add prior precision
-            if hasattr(self, 'prior_precision'):
-                if isinstance(self.prior_precision, float):
-                    self.H += self.prior_precision
-                else:
-                    self.H += self.prior_precision.to(self._device, self._dtype)
+        # After training, compute the final SWAG posterior
+        self._compute_swag_posterior()
 
-    def evaluate(self, data_loader: DataLoader, batch_size: int = None) -> float:
-        if batch_size is not None and batch_size < data_loader.batch_size:
-            # Create new DataLoader with smaller batch size
-            new_loader = DataLoader(
-                dataset=data_loader.dataset,
-                batch_size=batch_size,
-                shuffle=False,
-                num_workers=data_loader.num_workers
-            )
-            data_loader = new_loader
+        # Store final loss (average loss of the last epoch)
+        self.loss = avg_loss
 
-        # Rest of evaluation code remains the same
-        self.model.eval()
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for inputs, targets in data_loader:
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
+    def _update_swag_stats(self):
+        """Update running averages and collect weights for the low-rank part."""
+        current_params = parameters_to_vector(self.model.parameters()).detach().clone()
 
-                with autocast():
-                    outputs = self.model(inputs)
-                
-                # outputs = self.model(inputs)
-                _, predicted = outputs.max(1)
-                total += targets.size(0)
-                correct += predicted.eq(targets).sum().item()
-        return 100. * correct / total
+        # Update running moments for diagonal variance
+        if self.swag_mean_vec is None:
+            self.swag_mean_vec = torch.zeros_like(current_params)
+            self.swag_sq_mean_vec = torch.zeros_like(current_params)
+
+        n = self.n_models_collected + 1
+        # Update first moment (mean)
+        self.swag_mean_vec = (self.swag_mean_vec * (n - 1) + current_params) / n
+        # Update second moment (for variance)
+        self.swag_sq_mean_vec = (self.swag_sq_mean_vec * (n - 1) + current_params ** 2) / n
+
+        # Store weights for low-rank approximation
+        self._collected_weights.append(current_params)
+        self.n_models_collected += 1
+
+    def _compute_swag_posterior(self):
+        """Compute the final posterior from the collected SWAG statistics."""
+        if self.n_models_collected == 0:
+            raise RuntimeError("SWAG training did not collect any models. Check `swa_start` and `epochs`.")
+
+        # 1. Set the posterior mean
+        self.mean = self.swag_mean_vec.clone()
+        vector_to_parameters(self.mean, self.model.parameters())  # Set model to mean
+
+        # 2. Compute the diagonal precision H
+        diag_var = self.swag_sq_mean_vec - self.swag_mean_vec ** 2
+        # Clamp for numerical stability
+        diag_var = torch.clamp(diag_var, min=1e-6)
+
+        # The diagonal part of the Hessian is the inverse of the variance
+        self._init_H()  # H is a flat vector for DiagLaplace
+        self.H = 1.0 / diag_var
+
+        # Add prior precision
+        if hasattr(self, 'prior_precision'):
+            self.H += self.prior_precision_diag
+
+        # 3. Construct the low-rank deviation matrix D
+        if self.rank > 0 and len(self._collected_weights) > 0:
+            # D has shape (n_params, rank)
+            self.D = torch.stack(
+                [w - self.mean for w in self._collected_weights], dim=1
+            ).to(self.device)
+            # Adjust rank if fewer models were collected than requested
+            self.rank = self.D.shape[1]
+        else:
+            self.D = None
+            self.rank = 0
+
+    def sample(self, n_samples: int = 100):
+        """
+        Sample from the SWAG posterior N(mean, Cov).
+
+        Cov = Diag(1/H) + (1/rank) * D @ D.T
+        """
+        # Get samples from the diagonal part using the parent method
+        # This samples from N(mean, Diag(1/H))
+        samples = super().sample(n_samples)
+
+        # Add samples from the low-rank part
+        if self.D is not None and self.rank > 0:
+            # Sample from standard normal N(0, I)
+            z = torch.randn(self.rank, n_samples, device=self.device)
+
+            # Low-rank samples: (D @ z) / sqrt(rank)
+            # Shape of D is (n_params, rank), z is (rank, n_samples)
+            # Resulting shape is (n_params, n_samples)
+            low_rank_samples = (self.D @ z) / torch.sqrt(torch.tensor(self.rank))
+
+            # Add to diagonal samples
+            # Transpose to (n_samples, n_params) to match super().sample() output
+            samples += low_rank_samples.T
+
+        return samples
+
+    def functional_variance(self, Js: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the predictive variance, Var[f*] = J Cov J.T
+        Var[f*] = J (Diag(1/H) + (1/rank) * D @ D.T) J.T
+                 = J Diag(1/H) J.T + (1/rank) * (J @ D) @ (J @ D).T
+        """
+        # Get predictive variance from the diagonal part from the parent class
+        f_var_diag = super().functional_variance(Js)
+
+        if self.D is not None and self.rank > 0:
+            # Js has shape (batch, outputs, params)
+            # D has shape (params, rank)
+            # JD has shape (batch, outputs, rank)
+            JD = torch.einsum('bop,pk->bok', Js, self.D)
+
+            # (JD) @ (JD).T -> (batch, outputs, rank) @ (batch, rank, outputs)
+            # This computes the low-rank variance component
+            f_var_low_rank = torch.einsum('bok,brk->bor', JD, JD) / self.rank
+
+            return f_var_diag + f_var_low_rank
+        else:
+            return f_var_diag

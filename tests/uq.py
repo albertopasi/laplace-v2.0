@@ -126,37 +126,66 @@ def fit_models(args, train_loader, val_loader, device, num_features=None):
         elif args.method == 'swag_laplace':
             print("Fitting SWAG-Laplace...")
 
+            # --- Recommended Hardcoded Training Schedule ---
+            # Total number of epochs for the entire training run.
+            total_epochs = 2
+            # Epoch at which to start the SWA procedure.
+            swa_start_epoch = 0
+            # Initial learning rate for the pre-SWA phase.
+            initial_lr = 0.1
+            # Constant learning rate for the SWA phase.
+            swa_learning_rate = 0.01
+            # Rank of the low-rank covariance matrix (number of models to store).
+            swag_rank = 20
+            # Frequency (in epochs) to collect models during SWA.
+            swa_collection_freq = 1
+            # ------------------------------------------------
+
+            # Ensure the configuration is valid
+            if swa_start_epoch >= total_epochs:
+                raise ValueError("SWAG start epoch must be less than total epochs.")
+
+            # Initialize the SWAGLaplace instance
             model_instance = SWAGLaplace(
                 model,
                 likelihood=args.likelihood,
+                swa_start=swa_start_epoch,
+                swa_lr=swa_learning_rate,
+                rank=swag_rank,
+                swa_freq=swa_collection_freq,
                 prior_precision=args.prior_precision,
                 temperature=args.temperature,
-                n_models=20,
-                max_num_models=20,
-                swa_lr=args.swag_lr,
                 device=device
             )
 
+            # Use a standard optimizer. The SWAGLaplace class will handle the LR switch.
             optimizer = torch.optim.SGD(
                 model.parameters(),
-                lr=1e-4,
-                momentum=0.9
+                lr=initial_lr,
+                momentum=0.9,
+                weight_decay=0.0  # The prior is handled by Laplace, so set decay here to 0
             )
 
+            # Create the loss criterion based on the likelihood
             if args.likelihood == 'classification':
                 criterion = nn.CrossEntropyLoss()
             elif args.likelihood == 'regression':
                 criterion = nn.MSELoss()
             else:
-                raise ValueError(f"Unsupported likelihood for SWAG-Laplace criterion: {args.likelihood}")
+                raise ValueError(f"Unsupported likelihood: {args.likelihood}")
 
+            print(f"Training for {total_epochs} epochs, starting SWA at epoch {swa_start_epoch}.")
+
+            # Fit the model using the total number of epochs
             model_instance.fit(
                 train_loader,
                 optimizer=optimizer,
                 criterion=criterion,
-                epochs=10,
-                progress_bar=getattr(args, 'progress_bar', True)
+                epochs=total_epochs,
+                progress_bar=True
             )
+
+            # The final fitted model is the SWAGLaplace instance
             model = model_instance
 
         if args.likelihood == 'regression' and args.sigma_noise is None:
