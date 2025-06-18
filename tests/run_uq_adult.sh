@@ -39,7 +39,7 @@ for seed in "${SEEDS[@]}"; do
     python3 tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} --method laplace --subset_of_weights last_layer --run_name "${BENCHMARK}/laplace_ll_baseline_seed${seed}"
 
     echo "--> RUNNING BASELINE: LA* (Last-Layer, Full EF)"
-    python3 tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} --method laplace --subset_of_weights last_layer --hessian_structure full --approx_type ef --run_name "${BENCHMARK}/laplace_star_baseline_seed${seed}"
+    python3 tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} --method swag --subset_of_weights last_layer --hessian_structure full --approx_type ef --run_name "${BENCHMARK}/laplace_star_baseline_seed${seed}"
 
     echo "--> RUNNING BASELINE: Subspace Laplace"
     python3 tests/uq.py ${COMMON_ARGS} ${SEED_ARGS} ${SUBSPACE_ARGS} --run_name "${BENCHMARK}/subspace_baseline_seed${seed}"
