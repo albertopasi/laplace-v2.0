@@ -25,7 +25,7 @@ DATA_ROOT="$HOME/projects/laplace-v2.0/data"
 # This part should still work fine
 echo "Running Subspace Laplace on MNIST-OOD..."
 for seed in 6 12 13 523 972394; do
-  python uq.py --data_root "$DATA_ROOT" \
+  python3 uq.py --data_root "$DATA_ROOT" \
           --benchmark MNIST-OOD --model LeNet \
           --models_root models ${MNIST_ARGS} --model_seed "$seed"
 done
