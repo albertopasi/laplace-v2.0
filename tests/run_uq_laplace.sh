@@ -7,13 +7,13 @@ DATA_ROOT="$HOME/projects/laplace-v2.0/data"
 # =========================================================
 #  R-MNIST
 # =========================================================
-#for seed in 6 12 13 523 972394; do
-##  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
-##         --models_root models --method laplace --model_seed $seed --subset_of_weights all
-#
+for seed in 6 12 13 523 972394; do
 #  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
-#         --models_root models --method laplace --model_seed $seed --subset_of_weights last_layer
-#done
+#         --models_root models --method laplace --model_seed $seed --subset_of_weights all
+
+  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
+         --models_root models --method laplace --model_seed $seed --subset_of_weights last_layer
+done
 
 # =========================================================
 #  CIFAR-10-C

@@ -18,9 +18,9 @@ for seed in 6 12 13 523 972394; do
           --models_root models ${SUBSPACE_ARGS} --model_seed "$seed"
 done
 
-# # =========================================================
-#for seed in 6 12 13 523 972394; do
-#  python3 uq.py --data_root "$DATA_ROOT" \
-#          --benchmark CIFAR-10-OOD --model WRN16-4 \
-#          --models_root models --n_samples 30  ${SUBSPACE_ARGS} --model_seed "$seed"
-#done
+ # =========================================================
+for seed in 6 12 13 523 972394; do
+  python3 uq.py --data_root "$DATA_ROOT" \
+          --benchmark CIFAR-10-OOD --model WRN16-4 \
+          --models_root models --n_samples 30  ${SUBSPACE_ARGS} --model_seed "$seed"
+done
