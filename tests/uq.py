@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings('ignore')
 import torch.nn as nn
 
-from laplace.swag_laplace_new import SWAGLaplace
+from laplace.swag_laplace import SWAGLaplace
 
 
 def main(args):
@@ -127,9 +127,9 @@ def fit_models(args, train_loader, val_loader, device):
 
             # --- Recommended Hardcoded Training Schedule ---
             # Total number of epochs for the entire training run.
-            total_epochs = 2
+            total_epochs = 100
             # Epoch at which to start the SWA procedure.
-            swa_start_epoch = 0
+            swa_start_epoch = 75
             # Initial learning rate for the pre-SWA phase.
             initial_lr = 0.1
             # Constant learning rate for the SWA phase.
