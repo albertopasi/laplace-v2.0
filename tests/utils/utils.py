@@ -19,7 +19,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from tests.baselines.vanilla.models.mlp_tabular import MLPTabular
+from baselines.vanilla.models.mlp_tabular import MLPTabular
 
 def set_seed(seed):
     np.random.seed(seed)

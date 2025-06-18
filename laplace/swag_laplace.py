@@ -10,7 +10,6 @@ from tqdm import tqdm
 # Assumes baselaplace.py is in the same directory or python path
 from laplace.baselaplace import DiagLaplace
 
-
 class SWAGLaplace(DiagLaplace):
     """
     SWAG-as-a-Posterior, a method for uncertainty estimation in deep learning.
@@ -58,19 +57,19 @@ class SWAGLaplace(DiagLaplace):
     _key = ("all", "swag_laplace")
 
     def __init__(
-            self,
-            model: nn.Module,
-            likelihood: str,
-            swa_start: int = 10,
-            swa_lr: float = 0.01,
-            swa_freq: int = 1,
-            rank: int = 20,
-            sigma_noise: float = 1.0,
-            prior_precision: float = 1.0,
-            prior_mean: float = 0.0,
-            temperature: float = 1.0,
-            device=None,
-            **kwargs,
+        self,
+        model: nn.Module,
+        likelihood: str,
+        swa_start: int = 10,
+        swa_lr: float = 0.01,
+        swa_freq: int = 1,
+        rank: int = 20,
+        sigma_noise: float = 1.0,
+        prior_precision: float = 1.0,
+        prior_mean: float = 0.0,
+        temperature: float = 1.0,
+        device=None,
+        **kwargs,
     ):
         super().__init__(
             model,
@@ -87,12 +86,12 @@ class SWAGLaplace(DiagLaplace):
         else:
             self.device = next(model.parameters()).device
         self.model.to(self.device)
-
+        
         # SWA hyperparameters
         self.swa_start = swa_start
         self.swa_lr = swa_lr
         self.swa_freq = swa_freq
-
+        
         # Rank of the low-rank covariance approximation
         self.rank = rank
 
@@ -133,7 +132,7 @@ class SWAGLaplace(DiagLaplace):
 
         self.n_data = len(train_loader.dataset)
         self.model.train()
-
+        
         iterator = range(epochs)
         if progress_bar:
             iterator = tqdm(iterator, desc="SWAG Training")
@@ -149,32 +148,32 @@ class SWAGLaplace(DiagLaplace):
             total_loss = 0
             for X_batch, y_batch in train_loader:
                 X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
-
+                
                 optimizer.zero_grad()
                 output = self.model(X_batch)
                 loss = criterion(output, y_batch)
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-
+            
             avg_loss = total_loss / len(train_loader)
             if progress_bar:
                 iterator.set_postfix(loss=f"{avg_loss:.4f}", swa=is_swa_epoch)
-
+            
             # Collect weights during SWA phase
             if is_swa_epoch and (epoch - self.swa_start) % self.swa_freq == 0:
                 self._update_swag_stats()
 
         # After training, compute the final SWAG posterior
         self._compute_swag_posterior()
-
+        
         # Store final loss (average loss of the last epoch)
         self.loss = avg_loss
 
     def _update_swag_stats(self):
         """Update running averages and collect weights for the low-rank part."""
         current_params = parameters_to_vector(self.model.parameters()).detach().clone()
-
+        
         # Update running moments for diagonal variance
         if self.swag_mean_vec is None:
             self.swag_mean_vec = torch.zeros_like(current_params)
@@ -184,12 +183,12 @@ class SWAGLaplace(DiagLaplace):
         # Update first moment (mean)
         self.swag_mean_vec = (self.swag_mean_vec * (n - 1) + current_params) / n
         # Update second moment (for variance)
-        self.swag_sq_mean_vec = (self.swag_sq_mean_vec * (n - 1) + current_params ** 2) / n
-
+        self.swag_sq_mean_vec = (self.swag_sq_mean_vec * (n - 1) + current_params**2) / n
+        
         # Store weights for low-rank approximation
         self._collected_weights.append(current_params)
         self.n_models_collected += 1
-
+        
     def _compute_swag_posterior(self):
         """Compute the final posterior from the collected SWAG statistics."""
         if self.n_models_collected == 0:
@@ -197,20 +196,20 @@ class SWAGLaplace(DiagLaplace):
 
         # 1. Set the posterior mean
         self.mean = self.swag_mean_vec.clone()
-        vector_to_parameters(self.mean, self.model.parameters())  # Set model to mean
-
+        vector_to_parameters(self.mean, self.model.parameters()) # Set model to mean
+        
         # 2. Compute the diagonal precision H
-        diag_var = self.swag_sq_mean_vec - self.swag_mean_vec ** 2
+        diag_var = self.swag_sq_mean_vec - self.swag_mean_vec**2
         # Clamp for numerical stability
         diag_var = torch.clamp(diag_var, min=1e-6)
-
+        
         # The diagonal part of the Hessian is the inverse of the variance
-        self._init_H()  # H is a flat vector for DiagLaplace
+        self._init_H() # H is a flat vector for DiagLaplace
         self.H = 1.0 / diag_var
 
-        # Add prior precision
-        if hasattr(self, 'prior_precision'):
-            self.H += self.prior_precision_diag
+        # THE FOLLOWING LINES SHOULD BE REMOVED:
+        # if hasattr(self, 'prior_precision'):
+        #     self.H += self.prior_precision_diag
 
         # 3. Construct the low-rank deviation matrix D
         if self.rank > 0 and len(self._collected_weights) > 0:
@@ -238,12 +237,12 @@ class SWAGLaplace(DiagLaplace):
         if self.D is not None and self.rank > 0:
             # Sample from standard normal N(0, I)
             z = torch.randn(self.rank, n_samples, device=self.device)
-
+            
             # Low-rank samples: (D @ z) / sqrt(rank)
             # Shape of D is (n_params, rank), z is (rank, n_samples)
             # Resulting shape is (n_params, n_samples)
             low_rank_samples = (self.D @ z) / torch.sqrt(torch.tensor(self.rank))
-
+            
             # Add to diagonal samples
             # Transpose to (n_samples, n_params) to match super().sample() output
             samples += low_rank_samples.T
@@ -264,11 +263,11 @@ class SWAGLaplace(DiagLaplace):
             # D has shape (params, rank)
             # JD has shape (batch, outputs, rank)
             JD = torch.einsum('bop,pk->bok', Js, self.D)
-
+            
             # (JD) @ (JD).T -> (batch, outputs, rank) @ (batch, rank, outputs)
             # This computes the low-rank variance component
             f_var_low_rank = torch.einsum('bok,brk->bor', JD, JD) / self.rank
-
+            
             return f_var_diag + f_var_low_rank
         else:
             return f_var_diag
