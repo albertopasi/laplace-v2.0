@@ -23,17 +23,17 @@ CIFAR_ARGS="--method subspace \
 DATA_ROOT="$HOME/projects/laplace-v2.0/data"
 
 # This part should still work fine
-#echo "Running Subspace Laplace on MNIST-OOD..."
-#for seed in 6 12 13 523 972394; do
-#  python uq.py --data_root "$DATA_ROOT" \
-#          --benchmark MNIST-OOD --model LeNet \
-#          --models_root models ${MNIST_ARGS} --model_seed "$seed"
-#done
-
-# This is the part that was failing
-echo "Running Subspace Laplace on CIFAR-10-C..."
+echo "Running Subspace Laplace on MNIST-OOD..."
 for seed in 6 12 13 523 972394; do
-  python3 uq.py --data_root "$DATA_ROOT" \
-          --benchmark CIFAR-10-OOD --model WRN16-4 \
-          --models_root models ${CIFAR_ARGS} --model_seed "$seed"
+  python uq.py --data_root "$DATA_ROOT" \
+          --benchmark MNIST-OOD --model LeNet \
+          --models_root models ${MNIST_ARGS} --model_seed "$seed"
 done
+
+## This is the part that was failing
+#echo "Running Subspace Laplace on CIFAR-10-C..."
+#for seed in 6 12 13 523 972394; do
+#  python3 uq.py --data_root "$DATA_ROOT" \
+#          --benchmark CIFAR-10-OOD --model WRN16-4 \
+#          --models_root models ${CIFAR_ARGS} --model_seed "$seed"
+#done
