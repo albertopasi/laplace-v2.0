@@ -9,7 +9,7 @@ SEEDS=(6 12 13 523 972394)
 DATA_ROOT="./data"
 MODEL_NAME="MLPTabular"
 BENCHMARK="Adult"
-RESULTS_ROOT="./results/${BENCHMARK}"
+RESULTS_ROOT="results/${BENCHMARK}"
 
 # Ensure results directory exists
 mkdir -p $RESULTS_ROOT

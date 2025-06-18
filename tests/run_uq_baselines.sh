@@ -1,27 +1,27 @@
 #!/bin/bash
 cd tests
-DATA_ROOT="$HOME/projects/laplace-v2.0/data"
+DATA_ROOT="../data"
 #DATA_ROOT="data"
 # =========================================================
 #  R-MNIST
 # =========================================================
-for seed in 6 12 13 523 972394; do
+# for seed in 6 12 13 523 972394; do
 
-  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
-         --models_root models --method map --model_seed $seed
+#   python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
+#          --models_root models --method map --model_seed $seed
 
-  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
-         --models_root models --method ensemble --nr_components 5 --model_seed $seed
+#   python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST --model LeNet \
+#          --models_root models --method ensemble --nr_components 5 --model_seed $seed
 
-  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST \
-         --model LeNet-BBB-flipout --models_root models/bbb/flipout \
-         --method bbb --model_seed $seed
+#   python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST \
+#          --model LeNet-BBB-flipout --models_root models/bbb/flipout \
+#          --method bbb --model_seed $seed
 
-  python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST \
-         --model LeNet-CSGHMC --models_root models/csghmc \
-         --method csghmc --model_seed $seed
+#   python uq.py --data_root "${DATA_ROOT}" --benchmark R-MNIST \
+#          --model LeNet-CSGHMC --models_root models/csghmc \
+#          --method csghmc --model_seed $seed
 
-done
+# done
 #
 # =========================================================
 #  CIFAR-10-C
