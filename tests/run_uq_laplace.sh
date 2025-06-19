@@ -1,7 +1,7 @@
 #!/bin/bash
 cd tests
 
-DATA_ROOT="$HOME/projects/laplace-v2.0/data"
+DATA_ROOT="../data"
 #DATA_ROOT="data"
 
 # =========================================================
