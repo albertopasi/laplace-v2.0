@@ -4,7 +4,7 @@
 |:-------------------|:-------------|:----------------------------|
 | Serkan Akın        | 5531284      | Testing additional datasets |
 | Samuel Goldie      | 6125735      | Subspace Laplace variant    |
-| Denis Krylov       | xxxxxxx      | Swag Laplace variant        |
+| Denis Krylov       | 6277470      | Swag Laplace variant        |
 | Alberto Pasinato   | 6296173      | Hyperparameter sensitivity analysis |
 
 ## 1. Introduction
