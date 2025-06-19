@@ -165,7 +165,6 @@ def fit_models(args, train_loader, val_loader, device, num_features=None):
                 momentum=0.9,
                 weight_decay=0.0  # The prior is handled by Laplace, so set decay here to 0
             )
-
             # Create the loss criterion based on the likelihood
             if args.likelihood == 'classification':
                 criterion = nn.CrossEntropyLoss()

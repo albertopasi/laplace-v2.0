@@ -102,3 +102,4 @@ urllib3
 Werkzeug
 wilds
 yarl
+-e .
