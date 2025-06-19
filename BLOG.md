@@ -216,7 +216,6 @@ In conclusion, the `SwagLaplace` variant, while an interesting conceptual hybrid
 ### 3.3: Results on New Datasets
 
 
-
 ### 3.4: Hyperparameter Sensitivity Results
 
 #### 3.4.1 Prior Precision analysis
