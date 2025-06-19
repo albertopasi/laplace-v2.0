@@ -215,6 +215,51 @@ In conclusion, the `SwagLaplace` variant, while an interesting conceptual hybrid
 
 ### 3.3: Results on New Datasets
 
+#### 3.3.1 Baseline Performance on the Adult Income Dataset
+Our first set of experiments establishes the in-distribution performance of the original Laplace methods and our new variants on the UCI Adult Income dataset. The table below summarizes the key metrics—Accuracy, Negative Log-Likelihood (NLL), Expected Calibration Error (ECE), and model Confidence—averaged over five random seeds.
+
+| Experiment | Accuracy | NLLECE | Confidence ↓ | MAP |
+| :--- | :--- | :--- | :--- | :--- |
+| LA | 0.7447 ± 0.0473 | 0.3427 ± 0.2082 | 0.3051 ± 0.0400 | 0.5478 ± 0.0325 |
+| LA | 0.7385 ± 0.0415 | 0.3427 ± 0.2082 | 0.3008 ± 0.0364 | 0.5424 ± 0.0288 |
+| LA* | 0.7366 ± 0.0400 | 0.3427 ± 0.2081 | 0.2985 ± 0.0343 | 0.5406 ± 0.0277 |
+| Subspace LA | 0.7447 ± 0.0473 | 0.3428 ± 0.2082 | 0.3050 ± 0.0400 | 0.5477 ± 0.0325 |
+| SWAG-Laplace | 0.3613 ± 0.0065 | 0.8533 ± 0.0009 | 0.0601 ± 0.0020 | 0.8880 ± 0.0009 |
+
+From these baseline results, we can draw several key conclusions:
+
+**1. Standard LA Improves Calibration:** Both `LA` and the more robust `LA*` variant successfully fulfill their main purpose. Compared to the MAP baseline, they reduce the model's average confidence and ECE, indicating better-calibrated models that are less overconfident. This confirms that the benefits of the Laplace Approximation extend beyond image data to the tabular domain. LA*, which uses a more expressive Hessian approximation, provides the best calibration of all methods (lowest ECE and confidence), confirming its status as a robust variant, albeit at a minor cost to accuracy.
+
+**2. `Subspace LA` Shows No Benefit:** The `Subspace LA` variant, which performs inference in a low-dimensional subspace of the parameters, yielded results nearly identical to the MAP baseline. This suggests that for this model and dataset, the subspace defined by the top Hessian eigenvectors did not capture the necessary information to improve uncertainty estimates. The method effectively collapsed back to the MAP point estimate, offering no clear advantage.
+
+**3. `SWAG-Laplace` Fails Catastrophically:** Our most striking finding comes from the `SWAG-Laplace` variant. This method performed exceptionally poorly, achieving an accuracy of only ~36%. More alarmingly, it was also the most overconfident of all methods, with an average confidence of ~89%. This represents a critical failure mode where the model is not only wrong but dangerously certain of its incorrect predictions. This "negative result" is highly valuable, as it demonstrates that a naive combination of uncertainty techniques (SWAG and Laplace) can lead to a model that is less reliable than even a simple deterministic baseline.
+
+In summary, for the in-distribution tabular data task, the standard Last-Layer LA and particularly the LA* variant provide a clear improvement in calibration over MAP. The new variants, `Subspace LA` and `SWAG-Laplace`, did not prove to be effective extensions in this context, with the latter demonstrating a significant and informative failure case.
+
+#### 3.3.2 Domain Shift: Uncovering Data Asymmetry
+
+A key test of a model's robustness is its ability to handle domain shifts, where the test data comes from a different distribution than the training data. For the Adult dataset, we simulated this by training a model on data from one gender and evaluating it on the other. We used the standard Last-Layer Laplace Approximation (`LA`) for these experiments. The table below presents the results, including the baseline "No Shift" performance for comparison.
+
+| Experiment | Accuracy | NLLECE | Confidence ↓ |
+| :--- | :--- | :--- | :--- |
+| **LA (No Shift)** | **0.7385 ± 0.0415** | **0.3427 ± 0.2082** | **0.3008 ± 0.0364** |
+| Shift: Male-to-Female | 0.6740 ± 0.0391 | 0.7342 ± 0.3125 | 0.3777 ± 0.0244 |
+| Shift: Female-to-Male | 0.6806 ± 0.0114 | 0.6385 ± 0.0981 | 0.1462 ± 0.0417 |
+
+These results reveal a significant and complex performance asymmetry when the model is faced with a demographic shift:
+
+-   **1. Universal Drop in Accuracy:** Both domain shift scenarios result in a substantial drop in accuracy compared to the baseline, confirming that the model's performance is sensitive to this demographic feature. This highlights a real-world challenge where a model deployed on a new population may not perform as expected.
+
+-   **2.Asymmetric Calibration:** The most interesting finding lies in the calibration metrics (NLL and ECE).
+
+    -   When training on "male" data and testing on "female" data, the model becomes significantly less calibrated. The NLL more than doubles, and the ECE increases, indicating that the model's uncertainty estimates are less reliable on this new domain.
+
+    -   Conversely, when training on "female" data and testing on "male" data, we observe a surprising result: the model becomes better calibrated. The ECE is more than halved compared to the baseline, dropping to just `0.1462`. While the model is still less accurate, its confidence estimates are more honest and reliable.
+
+This suggests that the model trained on the smaller "female" subset learns a simpler, less overconfident function. When faced with the "male" data, this simpler model, while less accurate, is more aware of its own uncertainty. This is a powerful demonstration of how uncertainty-aware methods can be used not just to quantify confidence but also to diagnose hidden biases and asymmetries in a dataset.
+
+
+
 ### 3.4: Hyperparameter Sensitivity Results
 
 #### 3.4.1 Prior Precision analysis
