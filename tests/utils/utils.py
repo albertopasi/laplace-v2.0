@@ -19,6 +19,7 @@ try:
 except ModuleNotFoundError:
     pass
 
+from baselines.vanilla.models.mlp_tabular import MLPTabular
 
 def set_seed(seed):
     np.random.seed(seed)
@@ -29,7 +30,7 @@ def set_seed(seed):
         cudnn.benchmark = False
 
 
-def load_pretrained_model(args, model_idx, device):
+def load_pretrained_model(args, model_idx=None, device='cpu', num_features=None):
     """ Choose appropriate architecture and load pre-trained weights """
 
     if 'WILDS' in args.benchmark:
@@ -37,48 +38,52 @@ def load_pretrained_model(args, model_idx, device):
         model = wu.load_pretrained_wilds_model(dataset, args.models_root,
                                                device, model_idx, args.model_seed)
     else:
-        model = get_model(args.model, no_dropout=args.no_dropout, device=device)#.to(device)
-        if args.benchmark in ['R-MNIST', 'MNIST-OOD']:
-            fpath = os.path.join(args.models_root, 'lenet_mnist/lenet_mnist_{}_{}')
-        elif args.benchmark in ['R-FMNIST', 'FMNIST-OOD']:
-            fpath = os.path.join(args.models_root, 'lenet_fmnist/lenet_fmnist_{}.pt')
-        elif args.benchmark in ['CIFAR-10-C', 'CIFAR-10-OOD']:
-            fpath = os.path.join(args.models_root, 'wrn16_4_cifar10/wrn_16-4_cifar10_{}_{}')
-        elif args.benchmark == 'ImageNet-C':
-            fpath = os.path.join(args.models_root, 'wrn50_2_imagenet/wrn_50-2_imagenet_{}_{}')
+        # Pass num_features to get_model
+        model = get_model(args.model, num_features=num_features, no_dropout=args.no_dropout, device=device)
 
-        if args.method == 'csghmc':
-            fname = fpath.format(args.model_seed, model_idx+1)
-            state_dicts = torch.load(fname, map_location=device)
-
-            for m, state_dict in zip(model, state_dicts):
-                m.load_state_dict(state_dict)
-                m.to(device)
-
-            if args.data_parallel:
-                model = [torch.nn.DataParallel(m) for m in model]
+        if args.benchmark == 'Adult':
+            # For the Adult dataset, we don't load a pre-trained model.
+            # We will train it from scratch.
+            pass
         else:
-            if args.model_path is not None:
-                model.load_state_dict(torch.load(args.model_path, map_location=device),
-                                      strict=False)
+            # Logic for loading pre-trained image models
+            if args.benchmark in ['R-MNIST', 'MNIST-OOD']:
+                fpath = os.path.join(args.models_root, 'lenet_mnist/lenet_mnist_{}_{}')
+            elif args.benchmark in ['R-FMNIST', 'FMNIST-OOD']:
+                fpath = os.path.join(args.models_root, 'lenet_fmnist/lenet_fmnist_{}.pt')
+            elif args.benchmark in ['CIFAR-10-C', 'CIFAR-10-OOD']:
+                fpath = os.path.join(args.models_root, 'wrn16_4_cifar10/wrn_16-4_cifar10_{}_{}')
+            elif args.benchmark == 'ImageNet-C':
+                fpath = os.path.join(args.models_root, 'wrn50_2_imagenet/wrn_50-2_imagenet_{}_{}')
+
+            if args.method == 'csghmc':
+                fname = fpath.format(args.model_seed, model_idx+1)
+                state_dicts = torch.load(fname, map_location=device)
+                for m, state_dict in zip(model, state_dicts):
+                    m.load_state_dict(state_dict)
+                    m.to(device)
             else:
-                fname = (fpath.format(args.model_seed, model_idx+1) if 'FMNIST' not in args.benchmark 
-                         else fpath.format(args.model_seed))
-                load_model = (
-                    model.net
-                    if args.benchmark in ['R-MNIST', 'MNIST-OOD'] and 'BBB' not in args.model
-                    else model
-                )
-                load_model.load_state_dict(torch.load(fname , map_location=device))
-            model.to(device)
+                if args.model_path is not None:
+                    model.load_state_dict(torch.load(args.model_path, map_location=device), strict=False)
+                else:
+                    fname = (fpath.format(args.model_seed, model_idx+1) if 'FMNIST' not in args.benchmark
+                             else fpath.format(args.model_seed))
+                    load_model = model.net if hasattr(model, 'net') else model
+                    state_dict = torch.load(fname, map_location=device)
+                    load_model.load_state_dict(state_dict, strict=False)
+                model.to(device)
 
     if args.data_parallel and (args.method != 'csghmc'):
         model = torch.nn.DataParallel(model)
     return model
 
 
-def get_model(model_class, no_dropout=False, device=None):
-    if model_class == 'MLP':
+def get_model(model_class, no_dropout=False, device=None, num_features=None):
+    if model_class == 'MLPTabular':
+        if num_features is None:
+            raise ValueError('num_features must be specified for MLPTabular model.')
+        model = MLPTabular(num_features=num_features, num_classes=2).to(device)
+    elif model_class == 'MLP':
         model = mlp.MLP([784, 100, 100, 10], act='relu')
     elif model_class == 'LeNet':
         model = lenet.LeNet()
@@ -178,7 +183,7 @@ def prior_prec_to_tensor(args, prior_prec, model):
 
 def get_auroc(py_in, py_out):
     py_in, py_out = py_in.cpu().numpy(), py_out.cpu().numpy()
-    labels = np.zeros(len(py_in)+len(py_out), dtype='int32')
+    labels = np.zeros(len(py_in) + len(py_out), dtype='int32')
     labels[:len(py_in)] = 1
     examples = np.concatenate([py_in.max(1), py_out.max(1)])
     return roc_auc_score(labels, examples)
@@ -188,15 +193,15 @@ def get_fpr95(py_in, py_out):
     py_in, py_out = py_in.cpu().numpy(), py_out.cpu().numpy()
     conf_in, conf_out = py_in.max(1), py_out.max(1)
     tpr = 95
-    perc = np.percentile(conf_in, 100-tpr)
-    fp = np.sum(conf_out >=  perc)
-    fpr = np.sum(conf_out >=  perc) / len(conf_out)
+    perc = np.percentile(conf_in, 100 - tpr)
+    fp = np.sum(conf_out >= perc)
+    fpr = np.sum(conf_out >= perc) / len(conf_out)
     return fpr.item(), perc.item()
 
 
 def get_brier_score(probs, targets):
     targets = F.one_hot(targets, num_classes=probs.shape[1])
-    return torch.mean(torch.sum((probs - targets)**2, axis=1)).item()
+    return torch.mean(torch.sum((probs - targets) ** 2, axis=1)).item()
 
 
 def get_calib(pys, y_true, M=100):
@@ -228,7 +233,7 @@ def get_calib(pys, y_true, M=100):
     accs_bin, confs_bin = np.array(accs_bin), np.array(confs_bin)
     nitems_bin = np.array(nitems_bin)
 
-    ECE = np.average(np.abs(confs_bin-accs_bin), weights=nitems_bin/nitems_bin.sum())
+    ECE = np.average(np.abs(confs_bin - accs_bin), weights=nitems_bin / nitems_bin.sum())
     MCE = np.max(np.abs(accs_bin - confs_bin))
 
     return ECE, MCE
@@ -244,7 +249,7 @@ def get_calib_regression(pred_means, pred_stds, y_true, return_hist=False, M=10)
     ps = np.linspace(0, 1, M)
     cdf_vals = [st.norm(m, s).cdf(y_t) for m, s, y_t in zip(pred_means, pred_stds, y_true)]
     p_hats = np.array([len(np.where(cdf_vals <= p)[0]) / T for p in ps])
-    cal = T*mean_squared_error(ps, p_hats)  # Sum-squared-error
+    cal = T * mean_squared_error(ps, p_hats)  # Sum-squared-error
 
     return (cal, ps, p_hats) if return_hist else cal
 
@@ -255,7 +260,7 @@ def get_sharpness(pred_stds):
 
     pred_means be np.array
     '''
-    return np.mean(pred_stds**2)
+    return np.mean(pred_stds ** 2)
 
 
 def timing(fun):
@@ -270,7 +275,7 @@ def timing(fun):
         ret = fun()
         end.record()
         torch.cuda.synchronize()
-        elapsed_time = start.elapsed_time(end)/1000
+        elapsed_time = start.elapsed_time(end) / 1000
     else:
         start_time = time.time()
         ret = fun()
@@ -299,7 +304,7 @@ def save_results(args, metrics):
 def get_prior_precision(args, device):
     """ Obtain the prior precision parameter from the cmd arguments """
 
-    if type(args.prior_precision) is str: # file path
+    if type(args.prior_precision) is str:  # file path
         prior_precision = torch.load(args.prior_precision, map_location=device)
     elif type(args.prior_precision) is float:
         prior_precision = args.prior_precision

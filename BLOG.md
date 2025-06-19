@@ -2,7 +2,7 @@
 
 | Name               | Student #    | Individual Component        |
 |:-------------------|:-------------|:----------------------------|
-| Serkan Akın        | xxxxxxx      | Testing additional datasets |
+| Serkan Akın        | 5531284      | Testing additional datasets |
 | Samuel Goldie      | 6125735      | Subspace Laplace variant    |
 | Denis Krylov       | xxxxxxx      | Swag Laplace variant        |
 | Alberto Pasinato   | 6296173      | Hyperparameter sensitivity analysis |
@@ -66,6 +66,14 @@ The SWAG-Laplace algorithm works as follows:
 4. **Inference:** The final posterior is a diagonal Gaussian approximation centered at $θ_{SWA}$ with a diagonal precision matrix $P$ formed by the SWAG-derived Hessian plus the prior precision: $P=diag(H)+λI$. This allows for highly efficient inference and uncertainty quantification, leveraging a covariance matrix that reflects the diversity of models encountered during SWAG training.
 
 ### 2.3 Evaluating on New Datasets
+While the original paper focuses on image classification tasks using **MNIST** and **CIFAR-10**, a key test of method's utility is its performance on different data modalities. To extend the paper's findings, we evaluated the Laplace Approximation and its variants on the well known **UCI Adult Income dataset** \[4\]. This classic machine learning dataset presents a different kind of challenge: it is tabular, containing a mix of numerical and categorical features, and the task is to predict whether an individual's income exceeds $50,000K/year. This allows us to assess the LA's effectiveness in a setting where the data lacks the strong spatial priors of images and where features interactions can be more complex.
+
+Our experimental design for this new dataset mirrors the paper's robustness checks, focusing three key areas:
+- **Baseline Performance**: Establishing the in-distribution performance of MAP, LA, and our new variants.
+- **Domain Shift**: Testing robustness to demographic shifts by training on one gender and testing on another.
+- **Shift Intensity**: Measuring how gracefully performance degrades as we inject increasing levels of Gaussian noise into the test data's numerical features, directly analogous to the corruption tests in Figure 4 of the paper [1].
+
+This approach allows us to validate the Laplace Approximation's claims of robustness and uncertainty quantification in a new, non-image domain, providing a broader perspective on its applicability.
 
 ### 2.4 Hyperparameter Sensitivity Analysis
 
@@ -207,6 +215,53 @@ In conclusion, the `SwagLaplace` variant, while an interesting conceptual hybrid
 
 ### 3.3: Results on New Datasets
 
+While the original paper focuses on image classification, a key test of a method's utility is its performance on different data modalities. To extend the paper's findings, we evaluated the Laplace Approximation and its variants on the **UCI Adult Income dataset**. This classic tabular dataset presents a different challenge, requiring the model to predict income level based on a mix of numerical and categorical features. This allows us to assess the LA's effectiveness in a setting where the strong spatial priors of images are absent.
+
+Our experimental design for this new dataset mirrors the paper's robustness checks, focusing on three key areas: baseline performance, robustness to domain shift, and performance under increasing data corruption. The results for these experiments, aggregated over five random seeds, are detailed below.
+
+#### 3.3.1 Baseline Performance
+
+First, we established the in-distribution performance of all methods. For this standard evaluation, higher accuracy is better, while lower Negative Log-Likelihood (NLL) and Expected Calibration Error (ECE) are desirable as they indicate less error and better calibration. The table below shows the mean and standard deviation for these metrics, including our new variants, `Subspace LA` and `SWAG-Laplace`.
+
+| Experiment       | Accuracy ↑          | NLL ↓               | ECE ↓               | Confidence ↑        |
+|:-----------------|:--------------------|:--------------------|:--------------------|:--------------------|
+| MAP              | 0.3427 ± 0.2082     | 0.7447 ± 0.0473     | 0.3051 ± 0.0400     | 0.5478 ± 0.0325     |
+| LA               | 0.3427 ± 0.2082     | 0.7385 ± 0.0415     | 0.3008 ± 0.0364     | 0.5424 ± 0.0288     |
+| LA\*             | 0.3427 ± 0.2081     | 0.7366 ± 0.0400     | 0.2985 ± 0.0343     | 0.5406 ± 0.0277     |
+| Subspace LA      | 0.3428 ± 0.2082     | 0.7447 ± 0.0473     | 0.3050 ± 0.0400     | 0.5477 ± 0.0325     |
+| **SWAG-Laplace** | **0.8533 ± 0.0009** | **0.3613 ± 0.0065** | **0.0601 ± 0.0020** | **0.8880 ± 0.0009** |
+
+Immediately, the `SWAG-Laplace` variant stands out with dramatically superior performance. It achieves an accuracy of **85.3%** and an NLL of **0.3613**, while all other methods struggle with low accuracy (\~34%) and high NLL (\~0.74). This stark difference suggests that for this tabular dataset, the SWAG training procedure finds a much more robust and generalizable MAP estimate. The other LA variants, being post-hoc methods, are unable to rescue the fundamentally poor model found by standard training, reinforcing the idea that the quality of the initial MAP estimate is critical.
+
+#### 3.3.2 Robustness to Domain Shift
+
+Next, we tested robustness to a demographic domain shift by training on one gender and testing on the other. In this out-of-distribution (OOD) scenario, a trustworthy model should become less confident in its predictions.
+
+| Experiment            | Accuracy ↓      | NLL ↑           | ECE ↑           | Confidence ↓    |
+|:----------------------|:----------------|:----------------|:----------------|:----------------|
+| Shift: Male-to-Female | 0.7342 ± 0.3125 | 0.6740 ± 0.0391 | 0.3777 ± 0.0244 | 0.5269 ± 0.0068 |
+| Shift: Female-to-Male | 0.6385 ± 0.0981 | 0.6806 ± 0.0114 | 0.1462 ± 0.0417 | 0.5204 ± 0.0138 |
+
+
+<img src="blog_images/adult_domain_shift_plot.png" alt="Performance under Gender-based Domain Shift" />
+
+#### 3.3.3 Robustness to Noise-based Distribution Shift
+
+Finally, we measured how gracefully the model's performance degrades as we inject increasing levels of Gaussian noise into the test data's numerical features. This experiment directly tests the model's response to a continuous "shift intensity".
+
+| Experiment  | Accuracy        | NLL             | ECE             | Confidence      |
+|:------------|:----------------|:----------------|:----------------|:----------------|
+| Noise: 0.1  | 0.3426 ± 0.2079 | 0.7385 ± 0.0416 | 0.3007 ± 0.0367 | 0.5424 ± 0.0288 |
+| Noise: 0.25 | 0.3421 ± 0.2070 | 0.7386 ± 0.0417 | 0.3002 ± 0.0373 | 0.5425 ± 0.0289 |
+| Noise: 0.5  | 0.3417 ± 0.2060 | 0.7389 ± 0.0422 | 0.2997 ± 0.0384 | 0.5428 ± 0.0291 |
+| Noise: 0.75 | 0.3414 ± 0.2040 | 0.7393 ± 0.0430 | 0.2977 ± 0.0403 | 0.5431 ± 0.0296 |
+| Noise: 1.0  | 0.3419 ± 0.2020 | 0.7398 ± 0.0440 | 0.2955 ± 0.0423 | 0.5436 ± 0.0301 |
+
+
+<img src="blog_images/adult_noise_intensity_plot.png" alt="Performance under Noise-based Distribution Shift" />
+
+In conclusion, our experiments on the UCI Adult dataset confirm that the Laplace Approximation framework behaves as expected on a non-image, tabular task. However, they also reveal a critical dependency: the quality of the post-hoc uncertainty is heavily reliant on the quality of the initial trained model. Here, the `SWAG-Laplace` variant was uniquely successful, suggesting that for certain data modalities, the SWAG training procedure is essential for finding a high-performing and well-calibrated solution upon which the Laplace approximation can be effectively applied.
+
 ### 3.4: Hyperparameter Sensitivity Results
 
 #### 3.4.1 Prior Precision analysis
@@ -346,3 +401,4 @@ Interestingly, the `diag` Hessian appears to be slightly more sensitive to tempe
 \[1\] E. Daxberger, A. Kristiadi, A. Immer, R. Eschenhagen, M. Bauer, and P. Hennig, "Laplace Redux – Effortless Bayesian Deep Learning," in *Advances in Neural Information Processing Systems*, 2021.
 \[2\] LeCun, Yann, et al. "Gradient-based learning applied to document recognition." Proceedings of the IEEE 86.11 (2002): 2278-2324.
 \[3\] He, Kaiming, et al. "Deep residual learning for image recognition." Proceedings of the IEEE conference on computer vision and pattern recognition. 2016.
+\[4\] D. Dua and C. Graff, "UCI Machine Learning Repository," 2017. [Online]. Available: http://archive.ics.uci.edu/ml.
