@@ -142,7 +142,7 @@ To properly contextualize the performance of the Laplace Approximation, the auth
 
 ### Reproduction of Table 1
 
-We began by replicating their baseline results. Our findings confirm the paper's claims, as we were able to reproduce the reported metrics with only marginal differences, typically within a $1-2%$ margin. These minor variations are expected due to differences in hardware and software environments. We decided to include *run time* as a metric in the tables, in order additionally to compare the performance of the new algorithm variants w.r.t. the *vanilla* laplace method. The following Table shows combines all results of the reproduction, including those for the two new algorithm variants, which will be discussed in the following subsections.
+We began by replicating their baseline results. Our findings confirm the paper's claims, as we were able to reproduce the reported metrics with only marginal differences, typically within a $1/2\%$ margin. These minor variations are expected due to differences in hardware and software environments. We decided to include *run time* as a metric in the tables, in order additionally to compare the performance of the new algorithm variants w.r.t. the *vanilla* laplace method. The following Table shows combines all results of the reproduction, including those for the two new algorithm variants, which will be discussed in the following subsections.
 
 
 | Dataset   | Method             |Confidence ↓| AUROC ↑| Test time (s) ↓|
@@ -182,7 +182,7 @@ The most critical finding, however, is the **prohibitive computational cost**. A
 
 Both `subspace` and `laplace_all` are "all-layer" methods, which explains why their performance on metrics is often similar. The key difference lies in *how* they approximate the Hessian, which directly impacts the trade-off between performance and efficiency.
 
-- **Imperfection and Redundancy of the Subspace:** The power iteration method only provides an *approximation* of the true top Hessian eigenvectors. For a complex dataset like CIFAR-10, it's possible this approximation isn't precise enough, or that the chosen subspace dimension omits other important directions of curvature. Furthermore, the strong performance of simpler methods like `laplace_last_layer` suggests that much of the functionally relevant uncertainty might already be captured either in the final layer or by more structured approximations like KFAC, making the costly search for an "optimal" global subspace redundant.
+- **Redundancy of the Subspace:** The power iteration method only provides an *approximation* of the true top Hessian eigenvectors. For a complex dataset like CIFAR-10, it's possible this approximation isn't precise enough, or that the chosen subspace dimension omits other important directions of curvature. Furthermore, the strong performance of simpler methods like `laplace_last_layer` suggests that much of the functionally relevant uncertainty might already be captured either in the final layer or by more structured approximations like KFAC, making the costly search for an "optimal" global subspace redundant.
 
 In conclusion, while our `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and its marginal (or sometimes negative) performance gains.### 3.2: SwagLaplace Results
 
