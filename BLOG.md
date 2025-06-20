@@ -146,27 +146,27 @@ To properly contextualize the performance of the Laplace Approximation, the auth
 
 We began by replicating their baseline results. Our findings confirm the paper's claims, as we were able to reproduce the reported metrics with only marginal differences, typically within a $1/2\%$ margin. These minor variations are expected due to differences in hardware and software environments. We decided to include *run time* as a metric in the tables, in order additionally to compare the performance of the new algorithm variants w.r.t. the *vanilla* laplace method. The following Table shows combines all results of the reproduction, including those for the two new algorithm variants, which will be discussed in the following subsections.
 
-| Dataset   | Method             |Confidence ↓| AUROC ↑| Test time (s) ↓|
-|:---       |:---                |:---      |:---      |:---           |
-| MNIST     | MAP                | 76.1±2.2 | 92.1±0.9 | 0.72±0.1      |
-| MNIST     | DE                 | 65.4±0.6 | 94.0±0.2 | 2.12±0.44     |
-| MNIST     | VB                 | 58.4±1.9 | 88.9±0.9 | 4.24±0.81     |
-| MNIST     | HMC                | 69.4±0.9 | 90.6±0.4 | 3.79±0.25     |
-| MNIST     | SWAG               | 67.9±0.0 | 85.9±0.0 | 13.18±0.0     |
-| MNIST     | `laplace_all`        | 68.2±0.3 | 97.01±0.2| nan±nan       |
-| MNIST     | `laplace_last_layer` | 63.4±2.4 | 92.4±0.9 | 0.68±0.02     |
-| MNIST     | `subspace_laplace`   | **67.6±0.7** | **96.0±0.4** | **8.56±0.08**     |
-| MNIST     | `swag_laplace`       | **77.7±0.5** | **96.5±0.2** | **44.01±0.38**     |
-|-----------|----------------------|--------------|--------------|--------------------|
-| CIFAR-10  | MAP                | 75.0±0.6 | 96.5±0.2 | 0.52±0.02     |
-| CIFAR-10  | DE                 | 65.7±0.5 | 97.5±0.0 | 0.51±0.04     |
-| CIFAR-10  | VB                 | 73.3±1.4 | 95.8±0.3 | 1.23±0.02     |
-| CIFAR-10  | HMC                | 69.2±3.2 | 96.1±0.3 | 0.51±0.02     |
-| CIFAR-10  | SWAG               | 76.8±0.0 | 96.3±0.0 | 1.33±0.0      |
-| CIFAR-10  | `laplace_all`        | 69.03±0.7| 93.0±0.6 | nan±nan       |
-| CIFAR-10  | `laplace_last_layer` | 43.1±0.9 | 95.7±0.4 | 0.55±0.04     |
-| CIFAR-10  | `subspace_laplace`   | **72.7±2.4** | **92.5±0.8** | **21.73±4.34**    |
-| CIFAR-10  | `swag_laplace`       | **69.2±0.2** | **88.0±0.2** | **17.58±1.98**    |
+| Dataset   | Method               |Confidence ↓| AUROC ↑      |Test time (s) ↓|
+|:---       |:---                  |:---        |:---          |:---           |
+| MNIST     | MAP                  | 76.1±2.2   | 92.1±0.9     | 0.72±0.1      |
+| MNIST     | DE                   | 65.4±0.6   | 94.0±0.2     | 2.12±0.44     |
+| MNIST     | VB                   | 58.4±1.9   | 88.9±0.9     | 4.24±0.81     |
+| MNIST     | HMC                  | 69.4±0.9   | 90.6±0.4     | 3.79±0.25     |
+| MNIST     | SWAG                 | 67.9±0.0   | 85.9±0.0     | 13.18±0.0     |
+| MNIST     | `laplace_all`        | 68.2±0.3   | 97.01±0.2    | 18.13±0.2     |
+| MNIST     | `laplace_last_layer` | 63.4±2.4   | 92.4±0.9     | 0.68±0.02     |
+| MNIST     | `subspace_laplace`   |**67.6±0.7**| **96.0±0.4** | **8.56±0.08** |
+| MNIST     | `swag_laplace`       |**77.7±0.5**| **96.5±0.2** | **44.01±0.38**|
+|-----------|----------------------|------------|--------------|---------------|
+| CIFAR-10  | MAP                  | 75.0±0.6   | 96.5±0.2     | 0.52±0.02     |
+| CIFAR-10  | DE                   | 65.7±0.5   | 97.5±0.0     | 0.51±0.04     |
+| CIFAR-10  | VB                   | 73.3±1.4   | 95.8±0.3     | 1.23±0.02     |
+| CIFAR-10  | HMC                  | 69.2±3.2   | 96.1±0.3     | 0.51±0.02     |
+| CIFAR-10  | SWAG                 | 76.8±0.0   | 96.3±0.0     | 1.33±0.0      |
+| CIFAR-10  | `laplace_all`        | 69.03±0.7  | 93.0±0.6     | 25.13±0.6     |
+| CIFAR-10  | `laplace_last_layer` | 43.1±0.9   | 95.7±0.4     | 0.55±0.04     |
+| CIFAR-10  | `subspace_laplace`   |**72.7±2.4**| **92.5±0.8** | **21.73±4.34**|
+| CIFAR-10  | `swag_laplace`       |**69.2±0.2**| **88.0±0.2** | **17.58±1.98**|
 
 ### 3.1: Subspace Laplace Results
 
@@ -235,7 +235,6 @@ Next, we tested robustness to a demographic domain shift by training on one gend
 |:----------------------|:----------------|:----------------|:----------------|:----------------|
 | Shift: Male-to-Female | 0.7342 ± 0.3125 | 0.6740 ± 0.0391 | 0.3777 ± 0.0244 | 0.5269 ± 0.0068 |
 | Shift: Female-to-Male | 0.6385 ± 0.0981 | 0.6806 ± 0.0114 | 0.1462 ± 0.0417 | 0.5204 ± 0.0138 |
-
 
 <img src="blog_images/adult_domain_shift_plot.png" alt="Performance under Gender-based Domain Shift" />
 
@@ -343,8 +342,7 @@ Across all configurations, one finding is absolute: at high `prior_precision` (e
 
 At low `prior_precision` (e.g., 1e-06), the Hessian structure's impact is profound but is entirely mediated by the choice of `link_approx`.
 
-1.  **The `bridge` link**
-
+1. **The `bridge` link**
 When using the bridge link approximation at low prior_precision, we uncover a nuanced story with a clear divergence between the model's calibration (ECE) and its predictive likelihood (NLL).
 
 <img src="https://raw.githubusercontent.com/denskrlv/laplace-v2.0/main/hyperparams/blog_plots/summary_hessian_vs_precision_extremes_for_ece_bridge.png" alt="bridge-hessian_ece" width="1000"/>
@@ -358,7 +356,6 @@ From a likelihood (NLL) perspective, the model choice seems to make a difference
 For the deeper ResNet18 model (first row), capturing weight correlations is clearly beneficial for in-distribution and low-shift data. The `kron` Hessian provides a significantly lower (better) NLL, starting near-zero and outperforming the diag model up to a distribution shift of approximately 75°. This suggests that for ResNet18, the learned relationships between final-layer weights are important for making accurate predictions on familiar data. However, this reliance becomes a liability under severe distribution shift. Beyond 75°, the learned correlation structure becomes invalid and misleading, causing the kron model's performance to degrade sharply and fall below that of the more robust diag model. The `diag` approximation, by never relying on these complex correlations, degrades more gracefully, even if its initial performance is worse.
 
 The shallower and wider WideLeNet model behaves differently. Here, the `kron` Hessian is not just better, it is absolutely essential. It achieves near-perfect NLL on ID data, while the diag model fails catastrophically from the start, posting an extremely high NLL of ~12. This indicates that for WideLeNet's architecture, the correlations in the final layer are fundamental to the model's predictive capabilities, ignoring them makes the model effectively useless. While the `kron` model's performance also degrades and its NLL skyrockets after a moderate shift, it remains vastly superior to the `diag` model across the entire spectrum of rotations. In this case, a degraded correlated posterior is still significantly better than no correlation at all.
-
 2. **The `probit` link**
 
 When we switch to the probit link, the situation becomes much more nuanced and depends entirely on the degree of distribution shift for both of the metrics.
