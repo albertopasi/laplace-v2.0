@@ -217,7 +217,7 @@ Our experimental design for this new dataset mirrors the paper's robustness chec
 
 First, we established the in-distribution performance of all methods. For this standard evaluation, higher accuracy is better, while lower Negative Log-Likelihood (NLL) and Expected Calibration Error (ECE) are desirable as they indicate less error and better calibration. The table below shows the mean and standard deviation for these metrics, including our new variants, `Subspace LA` and `SWAG-Laplace`.
 
-| Experiment       | Accuracy ↑          | NLL ↓               | ECE ↓               | Confidence ↑        |
+| Experiment       | Accuracy            | NLL                 | ECE                 | Confidence          |
 |:-----------------|:--------------------|:--------------------|:--------------------|:--------------------|
 | MAP              | 0.3427 ± 0.2082     | 0.7447 ± 0.0473     | 0.3051 ± 0.0400     | 0.5478 ± 0.0325     |
 | LA               | 0.3427 ± 0.2082     | 0.7385 ± 0.0415     | 0.3008 ± 0.0364     | 0.5424 ± 0.0288     |
@@ -231,12 +231,14 @@ Immediately, the `SWAG-Laplace` variant stands out with dramatically superior pe
 
 Next, we tested robustness to a demographic domain shift by training on one gender and testing on the other. In this out-of-distribution (OOD) scenario, a trustworthy model should become less confident in its predictions.
 
-| Experiment            | Accuracy ↓      | NLL ↑           | ECE ↑           | Confidence ↓    |
+| Experiment            | Accuracy        | NLL             | ECE             | Confidence      |
 |:----------------------|:----------------|:----------------|:----------------|:----------------|
 | Shift: Male-to-Female | 0.7342 ± 0.3125 | 0.6740 ± 0.0391 | 0.3777 ± 0.0244 | 0.5269 ± 0.0068 |
 | Shift: Female-to-Male | 0.6385 ± 0.0981 | 0.6806 ± 0.0114 | 0.1462 ± 0.0417 | 0.5204 ± 0.0138 |
 
 <img src="blog_images/adult_domain_shift_plot.png" alt="Performance under Gender-based Domain Shift" />
+
+The robustness of the model was first tested against a demographic domain shift, where it was trained on data from one gender and evaluated on the other. The results show an expected drop in performance, with accuracy falling to between 64% and 73% depending on the shift direction. Crucially, this decrease in accuracy was accompanied by an increase in the Negative Log-Likelihood (NLL) and a corresponding decrease in the model's confidence. This demonstrates a key success of the uncertainty quantification framework: when faced with an out-of-distribution sample, the model not only becomes less accurate but also correctly signals its heightened uncertainty, which is the desired behavior for a trustworthy model.
 
 #### 3.3.3 Robustness to Noise-based Distribution Shift
 
@@ -252,6 +254,8 @@ Finally, we measured how gracefully the model's performance degrades as we injec
 
 
 <img src="blog_images/adult_noise_intensity_plot.png" alt="Performance under Noise-based Distribution Shift" />
+
+In the second experiment, the model's response to a continuous distribution shift was measured by injecting increasing levels of Gaussian noise into the test data's numerical features. The results show that the model's performance degrades gracefully as the noise intensity increases. As seen in the plots, the Negative Log-Likelihood (NLL) rises steadily with the noise level, indicating that the model becomes progressively more uncertain as the data becomes more corrupted and less familiar. This successful outcome shows that the Laplace framework effectively captures the increasing mismatch between the training and test distributions, with its uncertainty metrics scaling appropriately with the intensity of the shift.
 
 In conclusion, our experiments on the UCI Adult dataset confirm that the Laplace Approximation framework behaves as expected on a non-image, tabular task. However, they also reveal a critical dependency: the quality of the post-hoc uncertainty is heavily reliant on the quality of the initial trained model. Here, the `SWAG-Laplace` variant was uniquely successful, suggesting that for certain data modalities, the SWAG training procedure is essential for finding a high-performing and well-calibrated solution upon which the Laplace approximation can be effectively applied.
 
