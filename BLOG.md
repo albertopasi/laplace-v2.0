@@ -186,6 +186,8 @@ Both `subspace` and `laplace_all` are "all-layer" methods, which explains why th
 
 In conclusion, while our `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and its marginal (or sometimes negative) performance gains.### 3.2: SwagLaplace Results
 
+### 3.2: Swag Laplace Results
+
 Investigating the `SwagLaplace` variant yielded a surprising and highly informative set of results. The motivation was to test if using the empirical posterior distribution from Stochastic Weight Averaging-Gaussian (SWAG) could provide a more robust and effective prior for a subsequent Laplace approximation.
 
 The results on the MNIST OOD task are summarized in the table below, which includes our swag_laplace variant alongside the reproduced baselines:
