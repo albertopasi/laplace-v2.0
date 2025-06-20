@@ -390,6 +390,15 @@ Interestingly, the `diag` Hessian appears to be slightly more sensitive to tempe
 
 ## 4. Conclusion
 
+Our comprehensive investigation into **Laplace Redux** successfully confirms its central claims and demonstrates the high reproducibility of the authors' work. We began by replicating the key out-of-distribution detection results from Table 1, finding only minor deviations that fall within the expected margin of environmental variance. This initial success provided a solid foundation for our primary goal: to test the robustness and extensibility of the Laplace Approximation framework.
+
+Beyond simple replication, our project rigorously stress-tested the paper's methodology through four distinct extensions. The implementation of two novel variants, `SubspaceLaplace` and `SwagLaplace`, highlighted the modularity of the `laplace` library but ultimately reinforced the effectiveness of the authors' original design choices.
+Similarly, extending the evaluation to the UCI Adult tabular dataset validated the framework's applicability beyond image data, but also revealed its critical dependency on the quality of the initial MAP estimate.
+
+The hyperparameter sensitivity analysis revealed that the Laplace Approximation is not a "one-size-fits-all" solution but a dynamic framework whose performance depends on a complex interplay between its components. We uncovered a critical U-shaped trade-off for `prior_precision`, where strong regularization that benefits in-distribution calibration can be catastrophic for out-of-distribution robustness. Furthermore, we demonstrated that there is no universally "best" Hessian structure; its effectiveness is deeply intertwined with the choice of link approximation and the level of regularization. These findings provide a more complete picture for practitioners, highlighting that while the LA is powerful, its successful application requires careful consideration of these interacting hyperparameters.
+
+In summary, our work not only reproduces the results of "Laplace Redux" but also strengthens its conclusions. We have shown that the `laplace` library is a robust and extensible tool that facilitates further research. Our findings reaffirm the paper's central thesis: the Laplace Approximation is an accessible, powerful, and practical framework for bringing principled uncertainty quantification to deep learning.
+
 ## References
 
 \[1\] E. Daxberger, A. Kristiadi, A. Immer, R. Eschenhagen, M. Bauer, and P. Hennig, "Laplace Redux – Effortless Bayesian Deep Learning," in *Advances in Neural Information Processing Systems*, 2021.
