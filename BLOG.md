@@ -147,24 +147,24 @@ We began by replicating their baseline results. Our findings confirm the paper's
 
 | Dataset   | Method             |Confidence ↓| AUROC ↑| Test time (s) ↓|
 |:---       |:---                |:---      |:---      |:---           |
-| MNIST     | map                | 76.1±2.2 | 92.1±0.9 | 0.72±0.1      |
-| MNIST     | ensemble           | 65.4±0.6 | 94.0±0.2 | 2.12±0.44     |
-| MNIST     | bbb                | 58.4±1.9 | 88.9±0.9 | 4.24±0.81     |
-| MNIST     | csghmc             | 69.4±0.9 | 90.6±0.4 | 3.79±0.25     |
-| MNIST     | swg                | 67.9±0.0 | 85.9±0.0 | 13.18±0.0     |
-| MNIST     | laplace_all        | 68.2±0.3 | 97.01±0.2| nan±nan       |
-| MNIST     | laplace_last_layer | 63.4±2.4 | 92.4±0.9 | 0.68±0.02     |
-| MNIST     | subspace_laplace   | 67.6±0.7 | 96.0±0.4 | 8.56±0.08     |
-| MNIST     | swag_laplace       | 11.3±0.0 | 50.0±0.0 | 24.23±2.35     |
-| CIFAR-10  | map                | 75.0±0.6 | 96.5±0.2 | 0.52±0.02     |
-| CIFAR-10  | ensemble           | 65.7±0.5 | 97.5±0.0 | 0.51±0.04     |
-| CIFAR-10  | bbb                | 73.3±1.4 | 95.8±0.3 | 1.23±0.02     |
-| CIFAR-10  | csghmc             | 69.2±3.2 | 96.1±0.3 | 0.51±0.02     |
-| CIFAR-10  | swg                | 76.8±0.0 | 96.3±0.0 | 1.33±0.0      |
-| CIFAR-10  | laplace_all        | 69.03±0.7| 93.0±0.6 | nan±nan       |
-| CIFAR-10  | laplace_last_layer | 43.1±0.9 | 95.7±0.4 | 0.55±0.04     |
-| CIFAR-10  | subspace_laplace   | 72.7±2.4 | 92.5±0.8 | 21.73±4.34    |
-| CIFAR-10  | swag_laplace       | 69.2±0.2 | 88.0±0.2 | 17.58±1.98    |
+| MNIST     | MAP                | 76.1±2.2 | 92.1±0.9 | 0.72±0.1      |
+| MNIST     | DE                 | 65.4±0.6 | 94.0±0.2 | 2.12±0.44     |
+| MNIST     | VB                 | 58.4±1.9 | 88.9±0.9 | 4.24±0.81     |
+| MNIST     | HMC                | 69.4±0.9 | 90.6±0.4 | 3.79±0.25     |
+| MNIST     | SWAG               | 67.9±0.0 | 85.9±0.0 | 13.18±0.0     |
+| MNIST     | `laplace_all`        | 68.2±0.3 | 97.01±0.2| nan±nan       |
+| MNIST     | `laplace_last_layer` | 63.4±2.4 | 92.4±0.9 | 0.68±0.02     |
+| MNIST     | `subspace_laplace`   | 67.6±0.7 | 96.0±0.4 | 8.56±0.08     |
+| MNIST     | `swag_laplace`       | 11.3±0.0 | 50.0±0.0 | 24.23±2.35     |
+| CIFAR-10  | MAP                | 75.0±0.6 | 96.5±0.2 | 0.52±0.02     |
+| CIFAR-10  | DE                 | 65.7±0.5 | 97.5±0.0 | 0.51±0.04     |
+| CIFAR-10  | VB                 | 73.3±1.4 | 95.8±0.3 | 1.23±0.02     |
+| CIFAR-10  | HMC                | 69.2±3.2 | 96.1±0.3 | 0.51±0.02     |
+| CIFAR-10  | SWAG               | 76.8±0.0 | 96.3±0.0 | 1.33±0.0      |
+| CIFAR-10  | `laplace_all`        | 69.03±0.7| 93.0±0.6 | nan±nan       |
+| CIFAR-10  | `laplace_last_layer` | 43.1±0.9 | 95.7±0.4 | 0.55±0.04     |
+| CIFAR-10  | `subspace_laplace`   | 72.7±2.4 | 92.5±0.8 | 21.73±4.34    |
+| CIFAR-10  | `swag_laplace`       | 69.2±0.2 | 88.0±0.2 | 17.58±1.98    |
 
 ### 3.1: Subspace Laplace Results
 
