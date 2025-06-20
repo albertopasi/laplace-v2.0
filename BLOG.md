@@ -152,7 +152,7 @@ We began by replicating their baseline results. Our findings confirm the paper's
 | MNIST     | bbb                | 58.4±1.9 | 88.9±0.9 | 4.24±0.81     |
 | MNIST     | csghmc             | 69.4±0.9 | 90.6±0.4 | 3.79±0.25     |
 | MNIST     | swg                | 67.9±0.0 | 85.9±0.0 | 13.18±0.0     |
-| MNIST     | laplace_all        | nan±nan  | nan±nan  | nan±nan       |
+| MNIST     | laplace_all        | 68.2±0.3 | 97.01±0.2| nan±nan       |
 | MNIST     | laplace_last_layer | 63.4±2.4 | 92.4±0.9 | 0.68±0.02     |
 | MNIST     | subspace_laplace   | 67.6±0.7 | 96.0±0.4 | 8.56±0.08     |
 | MNIST     | swag_laplace       | 11.3±0.0 | 50.0±0.0 | 24.23±2.35     |
@@ -161,42 +161,34 @@ We began by replicating their baseline results. Our findings confirm the paper's
 | CIFAR-10  | bbb                | 73.3±1.4 | 95.8±0.3 | 1.23±0.02     |
 | CIFAR-10  | csghmc             | 69.2±3.2 | 96.1±0.3 | 0.51±0.02     |
 | CIFAR-10  | swg                | 76.8±0.0 | 96.3±0.0 | 1.33±0.0      |
-| CIFAR-10  | laplace_all        | nan±nan  | nan±nan  | nan±nan       |
+| CIFAR-10  | laplace_all        | 69.03±0.7| 93.0±0.6 | nan±nan       |
 | CIFAR-10  | laplace_last_layer | 43.1±0.9 | 95.7±0.4 | 0.55±0.04     |
-| CIFAR-10  | subspace_laplace   | 72.7±2.4 | 92.5±0.8 | 16.73±4.34    |
+| CIFAR-10  | subspace_laplace   | 72.7±2.4 | 92.5±0.8 | 21.73±4.34    |
 | CIFAR-10  | swag_laplace       | 69.2±0.2 | 88.0±0.2 | 17.58±1.98    |
-
-
 
 ### 3.1: Subspace Laplace Results
 
-Investigating the `SubspaceLaplace` variant yielded an insightful set of results: the core motivation was to test whether isolating the Laplace approximation to a low-dimensional subspace, defined by the directions of highest curvature (Hessian eigenvectors), could offer a more effective or efficient way to capture model uncertainty compared to full-rank or last-layer methods.
+Our investigation into the `SubspaceLaplace` variant yielded a nuanced set of results across both the MNIST and CIFAR-10 datasets. The core motivation was to test whether isolating the Laplace approximation to a low-dimensional subspace, defined by the directions of highest curvature (Hessian eigenvectors), could offer a more effective or efficient way to capture model uncertainty compared to methods that approximate the full parameter space.
 
-The results on the MNIST OOD task are summarized in the table below, which includes our `subspace` variant alongside the reproduced baselines:
+Across both datasets, the `subspace` variant proved to be a significant improvement over the standard MAP baseline, successfully reducing overconfidence in the face of OOD data. However, its performance relative to other Laplace methods and its computational cost tell a more complex story.
 
-From these results, we can draw several conclusions:
+On **MNIST**, the `subspace` method performs admirably. It reduces confidence to 67.6 (from MAP's 76.1) and improves the AUROC to 96.0 (from 92.1). Its performance is very similar to the standard `laplace_all` variant, achieving slightly better confidence for a marginally lower AUROC. This result validates the core hypothesis on a simpler dataset: the most critical uncertainty information does indeed seem to be contained within a low-dimensional subspace.
 
-1. **Effective Uncertainty Estimation, in Principle:** The `subspace` variant successfully reduces the model's overconfidence on OOD data, achieving a confidence score of 67.5. This is a significant improvement over the standard MAP baseline (75.0) and is identical to the full `laplace_all` method. This demonstrates that the core hypothesis—that the most critical uncertainty information is contained within a low-dimensional subspace—holds true to a large extent. The model correctly becomes less certain when faced with unfamiliar data.
+On the more complex **CIFAR-10** dataset, the results are more mixed. While `subspace` still improves confidence over MAP (72.7 vs. 75.0), this comes at the cost of a noticeably lower AUROC score (92.5 vs. 96.5). Compared to `laplace_all`, it performs slightly worse on both confidence and AUROC, suggesting that on more complex data distributions, the top Hessian eigenvectors alone may not capture all the functionally relevant information for OOD detection.
 
-2. **Prohibitive Computational Cost:** The most immediate and striking result is the `Fit Time`. At over 40 seconds, the `subspace` method is more than 20 times slower to fit than the standard `laplace_all`. This cost is incurred during the initial setup, specifically in the power iteration algorithm used to find the top eigenvectors of the Hessian. This process requires numerous Hessian-vector products, each of which involves a pass over the training data, making it computationally intensive. While this is a one-time cost before inference, it represents a significant practical barrier to its adoption.
-
-3. **No Clear Performance Advantage:** Despite the sophisticated approach and high computational cost, the `subspace` variant does not yield a superior AUROC score (95.8) compared to simpler methods. It performs slightly worse than `laplace_all` (96.0) and is notably outperformed by Deep Ensembles (97.5). This suggests that for this task, the uncertainty information captured by the top Hessian eigenvectors does not translate into better discriminative power for OOD detection.
+The most critical finding, however, is the **prohibitive computational cost**. As shown in the results table, the fit time for `subspace_laplace` is significantly higher than for other variants, taking 8.56s for MNIST and 21.73s for CIFAR-10. This is because the algorithm must first find the subspace, which involves an iterative power iteration method that requires multiple passes over the training data. This makes it substantially slower than the standard `laplace_all` which uses an efficient KFAC approximation.
 
 **Why is it not more effective?**
 
-The discrepancy between the method's theoretical appeal and its empirical performance invites some reflection. Several factors could be at play:
+Both `subspace` and `laplace_all` are "all-layer" methods, which explains why their performance on metrics is often similar. The key difference lies in *how* they approximate the Hessian, which directly impacts the trade-off between performance and efficiency.
 
-- **Imperfection of the Subspace:** The power iteration method only provides an *approximation* of the true top Hessian eigenvectors. It's possible that this approximation is not precise enough, or that the chosen subspace dimension ($K=20$ in our case) is suboptimal and omits other, less dominant but still important, directions of curvature.
-- **Redundancy of Information:** It is possible that for a well-regularized network, the most functionally relevant uncertainty is already captured by more structured approximations like KFAC (used by `laplace_all`) or is concentrated in the final layer (`laplace_last_layer`). The impressive performance of `laplace_last_layer` (lowest confidence) suggests that, for OOD detection, uncertainty in the feature extractor might be less critical. Therefore, the complex and costly search for a global "optimal" subspace may be redundant.
+- **Imperfection and Redundancy of the Subspace:** The power iteration method only provides an *approximation* of the true top Hessian eigenvectors. For a complex dataset like CIFAR-10, it's possible this approximation isn't precise enough, or that the chosen subspace dimension omits other important directions of curvature. Furthermore, the strong performance of simpler methods like `laplace_last_layer` suggests that much of the functionally relevant uncertainty might already be captured either in the final layer or by more structured approximations like KFAC, making the costly search for an "optimal" global subspace redundant.
 
-Therefore, while the `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and the marginal gains in uncertainty quantification.
-
-### 3.2: SwagLaplace Results
+In conclusion, while our `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and its marginal (or sometimes negative) performance gains.### 3.2: SwagLaplace Results
 
 Investigating the `SwagLaplace` variant yielded a surprising and highly informative set of results. The motivation was to test if using the empirical posterior distribution from Stochastic Weight Averaging-Gaussian (SWAG) could provide a more robust and effective prior for a subsequent Laplace approximation.
 
 The results on the MNIST OOD task are summarized in the table below, which includes our swag_laplace variant alongside the reproduced baselines:
-
 
 From these results, we can draw several conclusions:
 
