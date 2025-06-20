@@ -11,7 +11,7 @@ print("--- Starting Quick Compatibility Check for Adult Dataset ---")
 # 1. Set up device and data path
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
-data_path = './data'
+data_path = '../data'
 
 # 2. Load data to get one batch and the number of features
 try:

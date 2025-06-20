@@ -6,7 +6,7 @@ print("--- Running Data Loader Test ---")
 try:
     # Test the standard data loading
     (train_loader, val_loader, test_loader), num_features = get_adult_loaders(
-        data_path='./data', batch_size=256
+        data_path='../data', batch_size=256
     )
 
     print(f"Test successful!")

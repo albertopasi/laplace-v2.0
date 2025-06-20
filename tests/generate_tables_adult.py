@@ -6,7 +6,7 @@ import seaborn as sns
 from collections import defaultdict
 
 # --- Configuration ---
-RESULTS_DIR = 'tests/results/Adult/'
+RESULTS_DIR = 'results/Adult/'
 SEEDS = [6, 12, 13, 523, 972394]
 
 # Define the experiments and their human-readable names
