@@ -1,5 +1,8 @@
 # laplace-v2.0
 
+## Blog
+The blog can be found [here](BLOG.md)
+
 ## How to Run
 
 1. Make sure you have Docker and Docker Compose installed
