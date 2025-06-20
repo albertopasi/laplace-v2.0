@@ -66,9 +66,11 @@ The SWAG-Laplace algorithm works as follows:
 4. **Inference:** The final posterior is a diagonal Gaussian approximation centered at $θ_{SWA}$ with a diagonal precision matrix $P$ formed by the SWAG-derived Hessian plus the prior precision: $P=diag(H)+λI$. This allows for highly efficient inference and uncertainty quantification, leveraging a covariance matrix that reflects the diversity of models encountered during SWAG training.
 
 ### 2.3 Evaluating on New Datasets
+
 While the original paper focuses on image classification tasks using **MNIST** and **CIFAR-10**, a key test of method's utility is its performance on different data modalities. To extend the paper's findings, we evaluated the Laplace Approximation and its variants on the well known **UCI Adult Income dataset** \[4\]. This classic machine learning dataset presents a different kind of challenge: it is tabular, containing a mix of numerical and categorical features, and the task is to predict whether an individual's income exceeds $50,000K/year. This allows us to assess the LA's effectiveness in a setting where the data lacks the strong spatial priors of images and where features interactions can be more complex.
 
 Our experimental design for this new dataset mirrors the paper's robustness checks, focusing three key areas:
+
 - **Baseline Performance**: Establishing the in-distribution performance of MAP, LA, and our new variants.
 - **Domain Shift**: Testing robustness to demographic shifts by training on one gender and testing on another.
 - **Shift Intensity**: Measuring how gracefully performance degrades as we inject increasing levels of Gaussian noise into the test data's numerical features, directly analogous to the corruption tests in Figure 4 of the paper [1].
@@ -140,25 +142,37 @@ To properly contextualize the performance of the Laplace Approximation, the auth
 
 ### Reproduction of Table 1
 
-We began by replicating their baseline results. Our findings confirm the paper's claims, as we were able to reproduce the reported metrics with only marginal differences, typically within a $1-2%$ margin. These minor variations are expected due to differences in hardware and software environments. We decided to include *run time* as a metric in the tables, in order additionally to compare the performance of the new algorithm variants w.r.t. the *vanilla* laplace method.
+We began by replicating their baseline results. Our findings confirm the paper's claims, as we were able to reproduce the reported metrics with only marginal differences, typically within a $1-2%$ margin. These minor variations are expected due to differences in hardware and software environments. We decided to include *run time* as a metric in the tables, in order additionally to compare the performance of the new algorithm variants w.r.t. the *vanilla* laplace method. The following Table shows combines all results of the reproduction, including those for the two new algorithm variants, which will be discussed in the following subsections.
+
+
+| Dataset   | Method             |Confidence ↓| AUROC ↑| Test time (s) ↓|
+|:---       |:---                |:---      |:---      |:---           |
+| MNIST     | map                | 76.1±2.2 | 92.1±0.9 | 0.72±0.1      |
+| MNIST     | ensemble           | 65.4±0.6 | 94.0±0.2 | 2.12±0.44     |
+| MNIST     | bbb                | 58.4±1.9 | 88.9±0.9 | 4.24±0.81     |
+| MNIST     | csghmc             | 69.4±0.9 | 90.6±0.4 | 3.79±0.25     |
+| MNIST     | swg                | 67.9±0.0 | 85.9±0.0 | 13.18±0.0     |
+| MNIST     | laplace_all        | nan±nan  | nan±nan  | nan±nan       |
+| MNIST     | laplace_last_layer | 63.4±2.4 | 92.4±0.9 | 0.68±0.02     |
+| MNIST     | subspace_laplace   | 67.6±0.7 | 96.0±0.4 | 8.56±0.08     |
+| MNIST     | swag_laplace       | 11.3±0.0 | 50.0±0.0 | 24.23±2.35     |
+| CIFAR-10  | map                | 75.0±0.6 | 96.5±0.2 | 0.52±0.02     |
+| CIFAR-10  | ensemble           | 65.7±0.5 | 97.5±0.0 | 0.51±0.04     |
+| CIFAR-10  | bbb                | 73.3±1.4 | 95.8±0.3 | 1.23±0.02     |
+| CIFAR-10  | csghmc             | 69.2±3.2 | 96.1±0.3 | 0.51±0.02     |
+| CIFAR-10  | swg                | 76.8±0.0 | 96.3±0.0 | 1.33±0.0      |
+| CIFAR-10  | laplace_all        | nan±nan  | nan±nan  | nan±nan       |
+| CIFAR-10  | laplace_last_layer | 43.1±0.9 | 95.7±0.4 | 0.55±0.04     |
+| CIFAR-10  | subspace_laplace   | 72.7±2.4 | 92.5±0.8 | 16.73±4.34    |
+| CIFAR-10  | swag_laplace       | 69.2±0.2 | 88.0±0.2 | 17.58±1.98    |
+
+
 
 ### 3.1: Subspace Laplace Results
 
 Investigating the `SubspaceLaplace` variant yielded an insightful set of results: the core motivation was to test whether isolating the Laplace approximation to a low-dimensional subspace, defined by the directions of highest curvature (Hessian eigenvectors), could offer a more effective or efficient way to capture model uncertainty compared to full-rank or last-layer methods.
 
 The results on the MNIST OOD task are summarized in the table below, which includes our `subspace` variant alongside the reproduced baselines:
-
-| Method             | Confidence ↓ | AUROC ↑  | Fit Time (s) ↓ |
-| :----------------- | :----------- | :------- | :------------- |
-| MAP                | 75.0±0.6     | 96.5±0.2 | 0.64±0.01      |
-| DE                 | 65.7±0.5     | 97.5±0.0 | 0.68±0.05      |
-| VB                 | 73.3±1.4     | 95.9±0.3 | 1.76±0.01      |
-| HMC                | 69.2±3.2     | 96.1±0.3 | 0.66±0.01      |
-| SWAG               | 76.8±0.0     | 96.3±0.0 | 1.25±0.0       |
-| ---                | ---          | ---      | ---            |
-| `laplace_all`      | 67.5±0.4     | 96.0±0.2 | 2.00±0.3       |
-| `laplace_last_layer` | 43.1±0.9     | 95.7±0.4 | 0.68±0.04      |
-| `subspace`         | 67.5±0.4     | 95.8±0.4 | 41.02±0.28     |
 
 From these results, we can draw several conclusions:
 
@@ -175,7 +189,7 @@ The discrepancy between the method's theoretical appeal and its empirical perfor
 - **Imperfection of the Subspace:** The power iteration method only provides an *approximation* of the true top Hessian eigenvectors. It's possible that this approximation is not precise enough, or that the chosen subspace dimension ($K=20$ in our case) is suboptimal and omits other, less dominant but still important, directions of curvature.
 - **Redundancy of Information:** It is possible that for a well-regularized network, the most functionally relevant uncertainty is already captured by more structured approximations like KFAC (used by `laplace_all`) or is concentrated in the final layer (`laplace_last_layer`). The impressive performance of `laplace_last_layer` (lowest confidence) suggests that, for OOD detection, uncertainty in the feature extractor might be less critical. Therefore, the complex and costly search for a global "optimal" subspace may be redundant.
 
-In conclusion, while the `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and the marginal gains in uncertainty quantification.
+Therefore, while the `SubspaceLaplace` variant is a successful implementation of a theoretically sound idea, it does not present a practical advantage over existing methods in the `laplace` library. It validates the principle of low-dimensional uncertainty but demonstrates a poor trade-off between its extreme computational cost and the marginal gains in uncertainty quantification.
 
 ### 3.2: SwagLaplace Results
 
@@ -183,17 +197,6 @@ Investigating the `SwagLaplace` variant yielded a surprising and highly informat
 
 The results on the MNIST OOD task are summarized in the table below, which includes our swag_laplace variant alongside the reproduced baselines:
 
-| Method             | Confidence ↓ | AUROC ↑  | Fit Time (s) ↓ |
-| :----------------- | :----------- | :------- | :------------- |
-| MAP                | 75.0±0.6     | 96.5±0.2 | 0.64±0.01      |
-| DE                 | 65.7±0.5     | 97.5±0.0 | 0.68±0.05      |
-| VB                 | 73.3±1.4     | 95.9±0.3 | 1.76±0.01      |
-| HMC                | 69.2±3.2     | 96.1±0.3 | 0.66±0.01      |
-| SWAG               | 76.8±0.0     | 96.3±0.0 | 1.25±0.0       |
-| ---                | ---          | ---      | ---            |
-| `laplace_all`      | 67.5±0.4     | 96.0±0.2 | 2.00±0.3       |
-| `laplace_last_layer` | 43.1±0.9     | 95.7±0.4 | 0.68±0.04      |
-| `swag_laplace`         | 77.7±0.5     | 96.5±0.2 | 44.01±0.38     |
 
 From these results, we can draw several conclusions:
 
